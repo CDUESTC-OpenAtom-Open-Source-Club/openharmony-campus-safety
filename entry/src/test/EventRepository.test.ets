@@ -16,6 +16,8 @@ import { MemoryEventStore } from '../main/ets/repository/store/MemoryEventStore'
 
 import { EventRepository } from '../main/ets/repository/EventRepository';
 
+import { EventService } from '../main/ets/service/EventService';
+
 function buildEvent(id: string): SecurityEvent {
   return {
     id: id,
@@ -157,6 +159,40 @@ export default function eventRepositoryTest() {
       repo.deleteEvent('EVT100');
       const stored: SecurityEvent[] = await store.loadEvents();
       expect(stored.length).assertEqual(0);
+    });
+
+    it('event_service_seeds_empty_repository', 0, () => {
+      const events: SecurityEvent[] = EventService.getAllEvents();
+      expect(events.length).assertEqual(3);
+      expect(events[0].id).assertEqual('EVT001');
+    });
+
+    it('event_service_seed_only_once', 0, () => {
+      EventService.getAllEvents();
+      EventRepository.getInstance().deleteEvent('EVT001');
+      const events: SecurityEvent[] = EventService.getAllEvents();
+      expect(events.length).assertEqual(2);
+    });
+
+    it('event_service_confirm_persists_to_repository', 0, () => {
+      EventService.confirmEvent('EVT001');
+      const found = EventRepository.getInstance().getEventById('EVT001');
+      expect(found === undefined).assertFalse();
+      if (found !== undefined) {
+        expect(found.status).assertEqual(EventStatus.CONFIRMED);
+      }
+    });
+
+    it('event_service_create_task_and_deduplicate', 0, () => {
+      EventService.createTaskFromEvent('EVT003');
+      expect(EventService.getAllTasks().length).assertEqual(1);
+      expect(EventService.getAllTasks()[0].eventId).assertEqual('EVT003');
+      EventService.createTaskFromEvent('EVT003');
+      expect(EventService.getAllTasks().length).assertEqual(1);
+    });
+
+    it('event_service_get_event_by_id_unknown_returns_undefined', 0, () => {
+      expect(EventService.getEventById('UNKNOWN')).assertEqual(undefined);
     });
   });
 }
