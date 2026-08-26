@@ -77,5 +77,10 @@ export default function eventSimulatorTest() {
       expect(event.title.length > 0).assertTrue();
       expect(event.type !== undefined).assertTrue();
     });
+
+    it('batch_with_fractional_or_nonfinite_count_returns_empty', 0, () => {
+      expect(EventSimulator.simulateBatch(1.5).length).assertEqual(0);
+      expect(EventSimulator.simulateBatch(Infinity).length).assertEqual(0);
+    });
   });
 }

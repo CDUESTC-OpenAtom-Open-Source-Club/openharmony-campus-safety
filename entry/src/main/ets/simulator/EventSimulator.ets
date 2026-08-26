@@ -70,10 +70,10 @@ export class EventSimulator {
 
   /**
    * 批量生成安全事件。
-   * @param count 生成数量；小于等于 0 时返回空数组
+   * @param count 生成数量；非正整数或非整数时返回空数组
    */
   static simulateBatch(count: number): SecurityEvent[] {
-    if (count <= 0) {
+    if (!Number.isInteger(count) || count <= 0) {
       return [];
     }
     const events: SecurityEvent[] = [];
