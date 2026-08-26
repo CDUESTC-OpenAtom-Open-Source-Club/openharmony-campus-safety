@@ -44,5 +44,19 @@ export default function eventSimulatorTest() {
       const validTypes: EventType[] = [EventType.FIRE, EventType.ELECTRIC, EventType.FACILITY];
       expect(validTypes).assertContain(event.type);
     });
+
+    it('generate_batch_returns_expected_count', 0, () => {
+      const events: SecurityEvent[] = EventSimulator.simulateBatch(10);
+      expect(events.length).assertEqual(10);
+    });
+
+    it('generate_batch_ids_are_unique', 0, () => {
+      const events: SecurityEvent[] = EventSimulator.simulateBatch(50);
+      const idSet: Set<string> = new Set<string>();
+      events.forEach((event: SecurityEvent) => {
+        idSet.add(event.id);
+      });
+      expect(idSet.size).assertEqual(50);
+    });
   });
 }
