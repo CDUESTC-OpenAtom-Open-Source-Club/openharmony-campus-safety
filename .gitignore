@@ -10,3 +10,15 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+
+# ArkUI-X 跨端构建缓存与本机配置（保留工程源码）
+/.arkui-x/android/.gradle/
+/.arkui-x/android/local.properties
+
+# 项目规范与文档（不提交仓库）
+/C_MODULE_SPEC.md
+/CLAUDE.md
+/MODULE_BOUNDARIES.md
+/TECH_STACK.md
+/TESTING.md
+/WORKFLOW.md
