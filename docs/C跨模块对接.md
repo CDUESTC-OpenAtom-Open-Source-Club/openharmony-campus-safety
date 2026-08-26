@@ -4,7 +4,7 @@
 > 原则：C 不改 A/B；以下条目均为 Lycorius03 明确授权的最小必要改动。
 > 任何未在本表登记的 A/B 文件改动视为越界，不得提交。
 
-## 当前分支：feature/C-repository（M2 开发中）
+## 当前分支：feature/C-repository（M2 已实现，云手机重启恢复验证待 Lycorius03 执行）
 
 ---
 
