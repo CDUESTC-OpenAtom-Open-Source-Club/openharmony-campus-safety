@@ -57,6 +57,7 @@ export class EventRepository {
 
   /**
    * 空库播种（幂等）：仅第一次且缓存为空时写入种子。
+   * 内部先克隆种子对象，避免调用方种子模板被缓存引用后同址修改。
    */
   seedIfEmpty(seedEvents: SecurityEvent[]): void {
     if (this.seeded) {
@@ -64,7 +65,22 @@ export class EventRepository {
     }
     this.seeded = true;
     if (this.events.length === 0) {
-      this.saveEvents(seedEvents);
+      const clones: SecurityEvent[] = seedEvents.map((seed: SecurityEvent): SecurityEvent => {
+        const clone: SecurityEvent = {
+          id: seed.id,
+          title: seed.title,
+          type: seed.type,
+          location: seed.location,
+          description: seed.description,
+          reporter: seed.reporter,
+          reportTime: seed.reportTime,
+          status: seed.status,
+          priority: seed.priority,
+          handler: seed.handler
+        };
+        return clone;
+      });
+      this.saveEvents(clones);
     }
   }
 

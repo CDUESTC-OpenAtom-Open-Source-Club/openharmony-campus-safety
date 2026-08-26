@@ -194,5 +194,13 @@ export default function eventRepositoryTest() {
     it('event_service_get_event_by_id_unknown_returns_undefined', 0, () => {
       expect(EventService.getEventById('UNKNOWN')).assertEqual(undefined);
     });
+
+    it('seed_skipped_when_repository_preloaded', 0, () => {
+      const repo = EventRepository.getInstance();
+      repo.saveEvent(buildEvent('CUSTOM001'));
+      const events: SecurityEvent[] = EventService.getAllEvents();
+      expect(events.length).assertEqual(1);
+      expect(events[0].id).assertEqual('CUSTOM001');
+    });
   });
 }
