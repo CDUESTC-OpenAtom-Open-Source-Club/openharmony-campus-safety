@@ -53,20 +53,26 @@ export class RdbEventStore implements EventStore {
   async loadEvents(): Promise<SecurityEvent[]> {
     const resultSet: relationalStore.ResultSet = await this.rdbStore.querySql('SELECT * FROM security_event');
     const events: SecurityEvent[] = [];
-    while (resultSet.goToNextRow()) {
-      events.push(this.rowToEvent(resultSet));
+    try {
+      while (resultSet.goToNextRow()) {
+        events.push(this.rowToEvent(resultSet));
+      }
+    } finally {
+      resultSet.close();
     }
-    resultSet.close();
     return events;
   }
 
   async loadTasks(): Promise<Task[]> {
     const resultSet: relationalStore.ResultSet = await this.rdbStore.querySql('SELECT * FROM task');
     const tasks: Task[] = [];
-    while (resultSet.goToNextRow()) {
-      tasks.push(this.rowToTask(resultSet));
+    try {
+      while (resultSet.goToNextRow()) {
+        tasks.push(this.rowToTask(resultSet));
+      }
+    } finally {
+      resultSet.close();
     }
-    resultSet.close();
     return tasks;
   }
 
