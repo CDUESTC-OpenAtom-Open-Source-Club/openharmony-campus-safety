@@ -3,8 +3,7 @@ import { describe, it, expect } from '@ohos/hypium';
 import {
   SecurityEvent,
   EventStatus,
-  EventType,
-  EventPriority
+  EventType
 } from '../main/ets/model/SecurityEvent';
 
 import { EventSimulator } from '../main/ets/simulator/EventSimulator';
