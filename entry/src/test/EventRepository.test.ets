@@ -138,5 +138,25 @@ export default function eventRepositoryTest() {
       expect(repo.getEvents().length).assertEqual(0);
       expect(repo.getAllTasks().length).assertEqual(0);
     });
+
+    it('repository_write_through_save_propagates_to_store', 0, async () => {
+      const store = new MemoryEventStore();
+      EventRepository.initForTest(store);
+      const repo = EventRepository.getInstance();
+      repo.saveEvent(buildEvent('EVT100'));
+      const stored: SecurityEvent[] = await store.loadEvents();
+      expect(stored.length).assertEqual(1);
+      expect(stored[0].id).assertEqual('EVT100');
+    });
+
+    it('repository_write_through_delete_propagates_to_store', 0, async () => {
+      const store = new MemoryEventStore();
+      EventRepository.initForTest(store);
+      const repo = EventRepository.getInstance();
+      repo.saveEvent(buildEvent('EVT100'));
+      repo.deleteEvent('EVT100');
+      const stored: SecurityEvent[] = await store.loadEvents();
+      expect(stored.length).assertEqual(0);
+    });
   });
 }
