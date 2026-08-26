@@ -1,6 +1,6 @@
 # M2 Repository + ArkData 持久化 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 新增 C 模块 `EventRepository`（同步缓存 + 异步写穿）与 ArkData RDB 端侧持久化，并授权最小改动 A 的 `EventService`/`EntryAbility`，让现有数据流接入持久化（重启数据不丢）。
 
@@ -47,7 +47,7 @@
 - Create: `entry/src/test/EventRepository.test.ets`
 - Modify: `entry/src/test/List.test.ets`
 
-- [ ] **Step 1: 写失败测试（MemoryEventStore 的保存/加载/删除 + 任务）**
+- [x] **Step 1: 写失败测试（MemoryEventStore 的保存/加载/删除 + 任务）**
 
 创建 `entry/src/test/EventRepository.test.ets`：
 
@@ -128,7 +128,7 @@ export default function eventRepositoryTest() {
 }
 ```
 
-- [ ] **Step 2: 注册测试套件**
+- [x] **Step 2: 注册测试套件**
 
 修改 `entry/src/test/List.test.ets`：
 
@@ -144,12 +144,12 @@ export default function testsuite() {
 }
 ```
 
-- [ ] **Step 3: 运行确认失败**
+- [x] **Step 3: 运行确认失败**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD FAILED`，报 `Cannot find module .../repository/store/MemoryEventStore`（类尚未定义）。
 
-- [ ] **Step 4: 实现 EventStore 接口 + MemoryEventStore**
+- [x] **Step 4: 实现 EventStore 接口 + MemoryEventStore**
 
 创建 `entry/src/main/ets/repository/store/EventStore.ets`：
 
@@ -229,12 +229,12 @@ export class MemoryEventStore implements EventStore {
 }
 ```
 
-- [ ] **Step 5: 运行确认通过**
+- [x] **Step 5: 运行确认通过**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD SUCCESSFUL`，`EventRepositoryTest` 的 3 条 MemoryEventStore 用例全过。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add entry/src/main/ets/repository/store/EventStore.ets \
@@ -253,7 +253,7 @@ git commit -m "feat: add event store abstraction with memory implementation"
 - Create: `entry/src/main/ets/repository/EventRepository.ets`
 - Modify: `entry/src/test/EventRepository.test.ets`
 
-- [ ] **Step 1: 写失败测试（Repository CRUD + 任务方法 + 空数据处理）**
+- [x] **Step 1: 写失败测试（Repository CRUD + 任务方法 + 空数据处理）**
 
 在 `entry/src/test/EventRepository.test.ets` 的 `beforeEach` 加入 `EventRepository.initForTest(new MemoryEventStore())`，并在 `describe` 内追加：
 
@@ -337,12 +337,12 @@ import { EventRepository } from '../main/ets/repository/EventRepository';
     });
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD FAILED`，`Cannot find module .../repository/EventRepository`。
 
-- [ ] **Step 3: 实现 EventRepository**
+- [x] **Step 3: 实现 EventRepository**
 
 创建 `entry/src/main/ets/repository/EventRepository.ets`：
 
@@ -492,12 +492,12 @@ export class EventRepository {
 }
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD SUCCESSFUL`，全部 `EventRepositoryTest` 用例通过（含新 8 条）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add entry/src/main/ets/repository/EventRepository.ets entry/src/test/EventRepository.test.ets
@@ -512,7 +512,7 @@ git commit -m "feat: add event repository with sync cache and async write-throug
 - Modify: `entry/src/main/ets/service/EventService.ets`
 - Modify: `entry/src/test/EventRepository.test.ets`
 
-- [ ] **Step 1: 写失败测试（EventService 走 Repository + 播种幂等 + 确认/任务落盘）**
+- [x] **Step 1: 写失败测试（EventService 走 Repository + 播种幂等 + 确认/任务落盘）**
 
 在 `entry/src/test/EventRepository.test.ets` 的 `describe` 内追加（复用已有 `EventRepository.initForTest` beforeEach，并 import EventService）：
 
@@ -556,12 +556,12 @@ import { EventService } from '../main/ets/service/EventService';
     });
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `"$HV" test --no-daemon`
 Expected: 失败（EventService 仍是内存数组，`getAllEvents` 不播种 → `events.length` 不等于 3）。
 
-- [ ] **Step 3: 改造 EventService（数据源切换 + 播种）**
+- [x] **Step 3: 改造 EventService（数据源切换 + 播种）**
 
 整体替换 `entry/src/main/ets/service/EventService.ets` 为：
 
@@ -690,16 +690,16 @@ export class EventService {
 }
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD SUCCESSFUL`，全部 `EventRepositoryTest` 用例通过（含新 5 条 EventService 用例）。
 
-- [ ] **Step 5: 登记 A/B 改动到对接文档**
+- [x] **Step 5: 登记 A/B 改动到对接文档**
 
 在 `docs/C跨模块对接.md` 的 M2 表格，将第 1 行（EventService）状态从"已授权"更新为"已实现（本任务）"，并保留改动描述。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add entry/src/main/ets/service/EventService.ets entry/src/test/EventRepository.test.ets docs/C跨模块对接.md
@@ -716,7 +716,7 @@ git commit -m "feat: switch EventService data source to repository with seeding"
 
 > 说明：relationalStore 是系统 API，本地 Node 单测无法真实读写（无法注入设备 Context），本任务以**编译验证 + 云手机人工验证**为准（TESTING.md 第三级"应用运行测试"）。本地单测不覆盖本文件，符合 TESTING.md 优先级。
 
-- [ ] **Step 1: 实现 RdbEventStore**
+- [x] **Step 1: 实现 RdbEventStore**
 
 创建 `entry/src/main/ets/repository/store/RdbEventStore.ets`：
 
@@ -877,12 +877,12 @@ export class RdbEventStore implements EventStore {
 }
 ```
 
-- [ ] **Step 2: 编译验证**
+- [x] **Step 2: 编译验证**
 
 Run: `"$HV" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon`
 Expected: `BUILD SUCCESSFUL`。若 ArkTS 报 `as EventType` 类型断言错误，将对应行改为显式字符串→枚举映射（如 `value === EventType.FIRE ? EventType.FIRE : EventType.OTHER`）后重编。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add entry/src/main/ets/repository/store/RdbEventStore.ets
@@ -898,7 +898,7 @@ git commit -m "feat: add rdb event store with relationalStore persistence"
 - Modify: `entry/src/main/ets/entryability/EntryAbility.ets`
 - Modify: `docs/C跨模块对接.md`
 
-- [ ] **Step 1: 实现 RepositoryManager**
+- [x] **Step 1: 实现 RepositoryManager**
 
 创建 `entry/src/main/ets/repository/RepositoryManager.ets`：
 
@@ -930,7 +930,7 @@ export class RepositoryManager {
 }
 ```
 
-- [ ] **Step 2: 修改 EntryAbility（初始化后再加载首页）**
+- [x] **Step 2: 修改 EntryAbility（初始化后再加载首页）**
 
 将 `entry/src/main/ets/entryability/EntryAbility.ets` 顶部加 import，并把 `onWindowStageCreate` 改为初始化后再 loadContent：
 
@@ -995,21 +995,21 @@ export default class EntryAbility extends UIAbility {
 }
 ```
 
-- [ ] **Step 3: 编译验证**
+- [x] **Step 3: 编译验证**
 
 Run: `"$HV" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon`
 Expected: `BUILD SUCCESSFUL`。
 
-- [ ] **Step 4: 全量测试回归**
+- [x] **Step 4: 全量测试回归**
 
 Run: `"$HV" test --no-daemon`
 Expected: `BUILD SUCCESSFUL`，`Tests run: <全部> Failure: 0`（M1 11 条 + EventRepositoryTest 全部，总数应 ≥ 24）。
 
-- [ ] **Step 5: 登记 A/B 改动到对接文档**
+- [x] **Step 5: 登记 A/B 改动到对接文档**
 
 在 `docs/C跨模块对接.md` 的 M2 表格，将第 2 行（EntryAbility）状态更新为"已实现（本任务）"；顶部"待对齐事项"补充云手机验证结果待回填。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add entry/src/main/ets/repository/RepositoryManager.ets \
@@ -1026,12 +1026,12 @@ git commit -m "feat: initialize repository persistence before loading main page"
 **Files:**
 - 无新增代码（仅验证与推送）
 
-- [ ] **Step 1: 全量单测 + 编译**
+- [x] **Step 1: 全量单测 + 编译**
 
 Run: `"$HV" test --no-daemon` 和 `"$HV" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon`
 Expected: 两者 `BUILD SUCCESSFUL`；单测 `Failure: 0, Error: 0`。
 
-- [ ] **Step 2: 边界检查**
+- [x] **Step 2: 边界检查**
 
 ```bash
 git status
@@ -1040,7 +1040,7 @@ git log -1 --format='author=%an <%ae> / committer=%cn <%ce>'
 ```
 确认：改动仅 C 范围 + 授权 A 文件（EventService.ets / EntryAbility.ets）；无页面/Model/配置改动；身份为 `Lycorius03`；`docs/C跨模块对接.md` 已登记全部 A 改动。
 
-- [ ] **Step 3: 推送分支**
+- [x] **Step 3: 推送分支**
 
 ```bash
 git push origin feature/C-repository
