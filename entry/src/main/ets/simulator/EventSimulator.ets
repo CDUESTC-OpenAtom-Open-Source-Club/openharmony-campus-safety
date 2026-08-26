@@ -85,6 +85,7 @@ export class EventSimulator {
 
   private static resolveTemplateIndex(templateIndex?: number): number {
     if (templateIndex !== undefined &&
+      Number.isInteger(templateIndex) &&
       templateIndex >= 0 &&
       templateIndex < EventSimulator.templates.length) {
       return templateIndex;

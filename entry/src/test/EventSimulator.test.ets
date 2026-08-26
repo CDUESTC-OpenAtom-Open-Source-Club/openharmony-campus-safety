@@ -58,5 +58,24 @@ export default function eventSimulatorTest() {
       });
       expect(idSet.size).assertEqual(50);
     });
+
+    it('batch_with_non_positive_count_returns_empty', 0, () => {
+      expect(EventSimulator.simulateBatch(-1).length).assertEqual(0);
+      expect(EventSimulator.simulateBatch(0).length).assertEqual(0);
+    });
+
+    it('event_with_invalid_template_index_falls_back_safely', 0, () => {
+      const event: SecurityEvent = EventSimulator.simulateEvent(99);
+      expect(event.id.length > 0).assertTrue();
+      expect(event.title.length > 0).assertTrue();
+      expect(event.status).assertEqual(EventStatus.PENDING);
+    });
+
+    it('event_with_non_integer_index_falls_back_safely', 0, () => {
+      const event: SecurityEvent = EventSimulator.simulateEvent(1.5);
+      expect(event.id.length > 0).assertTrue();
+      expect(event.title.length > 0).assertTrue();
+      expect(event.type !== undefined).assertTrue();
+    });
   });
 }
