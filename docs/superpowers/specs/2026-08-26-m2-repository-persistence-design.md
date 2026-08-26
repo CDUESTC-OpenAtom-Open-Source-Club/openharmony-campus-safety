@@ -109,8 +109,8 @@ CREATE TABLE IF NOT EXISTS task (
 ## 7. 播种策略
 
 - 种子数据归属：`EVT001-003` 字面量**保留在 EventService**（A 的既有数据，不复制到 C）。
-- 触发点：EventService 内新增静态布尔 `seeded`；首次调用 `getAllEvents()` 时，若 `!seeded`：置 `seeded = true`，并检查 `EventRepository.getEvents()` 为空则 `saveEvents(种子)`。
-- 幂等：`seeded` 标志保证只播种一次；用户删除全部事件后重启，会再次播种（与现状行为一致，可接受）。
+- 触发点：EventService 各读方法（`getAllEvents/getPendingEvents/getEventById`）先调 `EventRepository.seedIfEmpty(EventService.seedEvents)`。
+- 幂等：`seedIfEmpty` 内部持 `seeded` 布尔（存于 EventRepository 实例，可随 `initForTest` 重置），只播种一次；非空库（重启后已恢复数据）不播；用户删除全部事件后再次启动会重新播种（与现状一致）。
 - 前提：`RepositoryManager.init` 已在页面出现前 await 完成，故首次读取时缓存已加载，不会误判空库。
 
 ## 8. 错误处理
