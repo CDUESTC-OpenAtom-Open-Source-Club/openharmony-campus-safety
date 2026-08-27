@@ -37,6 +37,16 @@
 
 ---
 
+## M4：测试体系 + 稳定性回归（feature/C-testing-stability）
+
+| # | A/B 文件 | 改动内容 | 原因 | 授权/对齐状态 |
+|---|---|---|---|---|
+| 4 | `entry/src/main/ets/pages/EventPage.ets` | 列表项 `onClick` 中 `pushPath` 用的 `pageStack` 由 `@Prop pageStack: NavPathStack` 改为普通成员变量 `pageStack: NavPathStack = new NavPathStack()`（默认值被 Index 构造参数 `EventPage({ pageStack: this.pageStack })` 覆盖，运行时仍是 Index 的同一实例）。其余逻辑零改动 | ArkUI-X 引擎下 `@Prop` 对 NavPathStack 对象做**深拷贝 + 单向同步**，拷贝副本的 JS 导航栈与原生导航栈状态不一致，副本上 `pushPath` 触发原生空指针崩溃（`JSNavPathStack::OnStateChanged()` SIGSEGV），表现为"进详情页必崩"。改为普通成员变量后真机复现验证通过（首页→列表→详情→确认→生成任务→任务列表 全链路存活） | 已授权（Lycorius03, 2026-08-27，用户指示"把闪退的事给解决了"）+ 已实现 + 已真机验证 |
+
+> 对齐提示（给 A/B）：M4 追加 1 处页面改动（EventPage.ets），仅替换 `pageStack` 的传递方式，不改布局/业务逻辑。该文件为 A 端页面，改动已在本表登记，A/B 联调时如需沿用请同步最新代码。EventService / 数据层对外接口签名不变。
+
+---
+
 ## 待对齐事项
 
 - （暂无）

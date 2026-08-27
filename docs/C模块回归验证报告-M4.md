@@ -26,13 +26,13 @@ M4 验收标准：测试通过 + 回归验证报告。
 | ArkUI-X 插件 | `@ohos/hvigor-ohos-arkui-x-plugin@4.20.4`（modelVersion 6.0.0） |
 | 单测框架 | Hypium / hamock |
 | Android 构建 | Gradle 8.4（华为云镜像 wrapper）+ AGP 7.4.1，SDK platform 33 / build-tools 30.0.3（自动补齐） |
-| 测试载体 | 命令行单测（Android 真机 Demo 回归待执行，见 §6） |
+| 测试载体 | 命令行单测 + Android 真机 Demo 回归（见 §6） |
 
 ## 3. 验证执行过程与结果
 
 ### 3.1 第一级：代码检查
 
-- M4 改动范围核对：仅 C 范围文件 + 1 个 A 文件最小改动（`EventService.ets` 的 `updateTaskStatus` 状态联动，已在 [C跨模块对接.md](C跨模块对接.md) M3 表第 3 条登记授权）。页面文件零改动。
+- M4 改动范围核对：仅 C 范围文件 + 2 个 A 文件最小改动（① `EventService.ets` 的 `updateTaskStatus` 状态联动，已在 [C跨模块对接.md](C跨模块对接.md) M3 表第 3 条登记授权；② `EventPage.ets` 的 `pageStack` 传递方式闪退修复，M4 表第 4 条登记授权）。其余页面零改动。
 - 复用现有模型与服务接口：`EventWorkflowService` 直接复用 `EventSimulator` / `EventRepository` / `EventService`，未复制第二套 Event/Task 模型，符合 C 模块边界。
 - ArkTS 类型约束通过编译（CompileArkTS 完成，无 Error，仅 `RdbEventStore.ets` 抛出异常处理提示类 WARN）。
 
@@ -103,14 +103,31 @@ APK 内容核验（unzip / aapt）：
 - `/.arkui-x/android/app/src/main/assets/`（abc / resources.index）
 - `/.arkui-x/android/.gradle/`、`/local.properties`（原已排除）
 
-## 6. 遗留事项（下一阶段 / 真机回归）
+## 6. Android 真机验证补充（2026-08-27，OPPO A56 5G）
 
-| 事项 | 说明 | 责任人 |
+真机执行了 C 数据层验证（与 UI 渲染无关的部分），结果如下：
+
+| 验证项 | 方式 | 结果 |
 |---|---|---|
-| Android 真机 Demo 回归 | 安装 `app-debug.apk`，按回归最低范围逐条验证：首页 → 事件列表 → 事件详情 → 事件确认 → 生成任务 → 任务列表 | Lycorius03 |
-| 云手机/真机重启恢复验证 | RDB 真实文件持久化的重启恢复（构建级已验证 .so 入包，行为级待真机确认） | Lycorius03 |
-| iOS 跨端构建 | ArkUI-X 同样支持 iOS，本轮未验证 | Lycorius03 |
+| RDB 建表 | `run-as` 拉取 `files/database/rdb/campus_safety.db` 核对 | ✅ `security_event` / `task` 表结构正确，枚举以中文落库（待确认/已确认/处理中/已完成） |
+| 种子数据落盘 | 同上 | ✅ EVT001（教学楼走廊漏水/待确认/高）、EVT002（已确认/紧急）、EVT003（处理中/中）全部入库 |
+| 重启持久化 | force-stop → am start 重启后重新拉库 | ✅ 种子数据完整保留，`ensureSeeded` 幂等，未重复播种 |
+| 状态流转链路 | 命令行单测 | ✅ 51/51（确认→派单→处理→完成 全流程状态机 + 稳定性） |
 
-## 7. 声明
+**闪退定位与修复（2026-08-27）：**
+- 现象：22:40 进程 `com.example.hongmengzhian`（pid 13037）`Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x40`，null pointer dereference，backtrace 固定为 `libarkui_android.so (OHOS::Ace::Framework::JSNavPathStack::OnStateChanged()+0)` ← `JsiClass<JSNavPathStack>::MethodCallback` ← `[anon:ArkTS Code]`。
+- 根因（分步复现锁定）：一级 push（进事件列表）正常；二级 push（进详情页）必崩；对照实验 push 无 `pageStack` 传参的 TaskPage（纯二级页面）不崩 → 崩溃与 `EventPage` 的 `@Prop pageStack: NavPathStack` 强相关。`@Prop` 对对象做**深拷贝 + 单向同步**，拷贝副本的 JS 导航栈与 ArkUI-X 原生导航栈状态不一致，副本上 `pushPath` 触发原生空指针。
+- 修复：`EventPage.ets` 的 `@Prop pageStack: NavPathStack` 改为普通成员变量 `pageStack: NavPathStack = new NavPathStack()`，由 Index 构造参数 `EventPage({ pageStack: this.pageStack })` 覆盖默认值，与 Index 保持同一实例（改动已登记 [C跨模块对接.md](C跨模块对接.md) M4 表第 4 条）。
+- 验证：重新构建 HAP + 手动 gradle 打包 APK → 真机覆盖安装 → 首页→列表→详情（二级 push）→确认事件→生成任务→任务列表 全链路进程存活，无崩溃。**闪退已解决。**
 
-本报告所有条目均为实际执行并验证的结果：单测输出 `Tests run: 51, Failure: 0, Error: 0, Pass: 51`；gradle 输出 `BUILD SUCCESSFUL in 46s`；APK 由 aapt/unzip 实际核验。未执行的真机回归已如实列入 §6，不做"已通过"宣称。
+## 7. 遗留事项
+
+| 事项 | 说明 | 责任人 | 状态 |
+|---|---|---|---|
+| Android 真机 Demo 回归（UI 链路） | 首页 → 事件列表 → 事件详情 → 确认 → 生成任务 → 任务列表 的界面操作回归 | Lycorius03 | ✅ 已通过（2026-08-27，修复 §6 闪退后真机全链路回归，进程存活） |
+| C 数据层真机验证 | 建表 / 种子落盘 / 重启持久化 | Lycorius03 | ✅ 已在本轮完成（§6） |
+| iOS 跨端构建 | ArkUI-X 同样支持 iOS，本轮未验证 | Lycorius03 | 待执行 |
+
+## 8. 声明
+
+本报告所有条目均为实际执行并验证的结果：单测输出 `Tests run: 51, Failure: 0, Error: 0, Pass: 51`；gradle 输出 `BUILD SUCCESSFUL in 46s`；APK 由 aapt/unzip 实际核验；Android 真机 Demo 回归（UI 链路）与 C 数据层持久化验证均已在 OPPO A56 5G 真机上实际执行通过。
