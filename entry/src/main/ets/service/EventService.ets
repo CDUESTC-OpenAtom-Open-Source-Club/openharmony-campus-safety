@@ -104,7 +104,7 @@ export class EventService {
       title: event.title,
       location: event.location,
       description: event.description,
-      assignee: '待分配',
+      assignee: 'inspector_001',
       createTime: event.reportTime,
       status: TaskStatus.PENDING
     };
@@ -114,6 +114,18 @@ export class EventService {
 
   static getAllTasks(): Task[] {
     return EventRepository.getInstance().getAllTasks();
+  }
+  static getMyTaskList(userId: string): Task[] {
+    return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
+  }
+
+  static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): void {
+    const tasks = EventRepository.getInstance().getAllTasks();
+    const task = tasks.find((t: Task) => t.id === taskId);
+    if (task !== undefined) {
+      task.status = status;
+      EventRepository.getInstance().saveTask(task);
+    }
   }
 
   private static ensureSeeded(): void {

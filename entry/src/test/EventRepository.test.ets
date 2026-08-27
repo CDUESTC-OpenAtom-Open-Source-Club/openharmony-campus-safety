@@ -202,5 +202,24 @@ export default function eventRepositoryTest() {
       expect(events.length).assertEqual(1);
       expect(events[0].id).assertEqual('CUSTOM001');
     });
+
+    it('event_service_get_my_task_list', 0, () => {
+      EventService.createTaskFromEvent('EVT003');
+      const myTasks = EventService.getMyTaskList('inspector_001');
+      expect(myTasks.length).assertEqual(1);
+      expect(myTasks[0].eventId).assertEqual('EVT003');
+      const otherTasks = EventService.getMyTaskList('other_user');
+      expect(otherTasks.length).assertEqual(0);
+    });
+
+    it('event_service_update_task_status', 0, () => {
+      EventService.createTaskFromEvent('EVT003');
+      const tasks = EventService.getAllTasks();
+      expect(tasks.length).assertEqual(1);
+      const taskId = tasks[0].id;
+      EventService.updateTaskStatus(taskId, TaskStatus.PROCESSING, '处理中');
+      const updated = EventRepository.getInstance().getAllTasks()[0];
+      expect(updated.status).assertEqual(TaskStatus.PROCESSING);
+    });
   });
 }
