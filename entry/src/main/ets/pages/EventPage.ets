@@ -6,7 +6,11 @@ import { EventService } from '../service/EventService';
 
 @Component
 export struct EventPage {
-  @Prop pageStack: NavPathStack;
+  // 修复闪退：NavPathStack 不得用 @Prop 传递（@Prop 对对象做深拷贝，
+  // 拷贝副本的 pushPath 触发原生导航栈状态不一致 → JSNavPathStack::OnStateChanged SIGSEGV）。
+  // 按 ArkUI Navigation 官方规范改用普通成员变量，与 Index 的 pageStack 保持同一实例。
+  // 默认值仅用于满足 ArkTS 初始化约束；Index 构造 EventPage 时传入的 pageStack 会覆盖它。
+  pageStack: NavPathStack = new NavPathStack();
   @State private events: SecurityEvent[] =
     EventService.getAllEvents();
 

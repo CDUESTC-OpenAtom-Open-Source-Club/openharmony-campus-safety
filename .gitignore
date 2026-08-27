@@ -14,6 +14,8 @@
 # ArkUI-X 跨端构建缓存与本机配置（保留工程源码）
 /.arkui-x/android/.gradle/
 /.arkui-x/android/local.properties
+/.arkui-x/android/app/libs/
+/.arkui-x/android/app/src/main/assets/
 
 # 项目规范与文档（不提交仓库）
 /C_MODULE_SPEC.md
@@ -22,3 +24,9 @@
 /TECH_STACK.md
 /TESTING.md
 /WORKFLOW.md
+
+# 本地回归验证临时目录（截图/ASCII 工具，不入库）
+/.regression/
+# 通用系统/IDE 杂物
+.DS_Store
+*.iml
