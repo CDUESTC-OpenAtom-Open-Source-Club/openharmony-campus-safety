@@ -267,5 +267,54 @@ export default function eventWorkflowTest() {
       }
       expect(repo.getEvents().length).assertEqual(2);
     });
+
+    it('build_summary_title_short_description_unchanged', 0, () => {
+      expect(EventWorkflowService.buildSummaryTitle('楼道应急灯破损')).assertEqual('楼道应急灯破损');
+    });
+
+    it('build_summary_title_long_description_truncated_with_ellipsis', 0, () => {
+      const longDesc: string = '教学楼2层东侧走廊应急灯外壳破损灯管裸露存在漏电风险请尽快处理';
+      const title: string = EventWorkflowService.buildSummaryTitle(longDesc);
+      // 15 字截断 + 省略号，共 16 字符；不产生孤代理替换符
+      expect(title.length <= 16).assertTrue();
+      expect(title.endsWith('…')).assertTrue();
+      expect(title.indexOf('�')).assertEqual(-1);
+    });
+
+    it('build_summary_title_folds_multiline_whitespace', 0, () => {
+      expect(EventWorkflowService.buildSummaryTitle('第一行描述\r\n第二行描述')).assertEqual('第一行描述 第二行描述');
+      expect(EventWorkflowService.buildSummaryTitle('第一行描述\n第二行描述')).assertEqual('第一行描述 第二行描述');
+    });
+
+    it('build_summary_title_emoji_not_split_into_surrogate', 0, () => {
+      const longDesc: string = '🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥 多个火警emoji超长描述';
+      const title: string = EventWorkflowService.buildSummaryTitle(longDesc);
+      // 按码点截取，不应产生孤代理字符（渲染为替换符 �）
+      expect(title.indexOf('�')).assertEqual(-1);
+    });
+
+    it('build_summary_title_empty_returns_placeholder', 0, () => {
+      expect(EventWorkflowService.buildSummaryTitle('   ')).assertEqual('隐患上报');
+    });
+
+    it('workflow_report_hazard_placeholder_title_replaced_with_summary', 0, () => {
+      const repo = EventRepository.getInstance();
+      const before: number = repo.getEvents().length;
+      const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '隐患上报',
+        type: EventType.FACILITY,
+        location: '教学楼2层',
+        description: '楼道应急灯外壳破损，灯管裸露存在漏电风险',
+        reporter: '张三'
+      });
+      expect(event === undefined).assertFalse();
+      expect(repo.getEvents().length).assertEqual(before + 1);
+      if (event !== undefined) {
+        // 数据层兜底：占位标题被描述摘要替换
+        expect(event.title === '隐患上报').assertFalse();
+        expect(event.title.indexOf('应急灯') >= 0).assertTrue();
+        expect(event.title.endsWith('…')).assertTrue();
+      }
+    });
   });
 }

@@ -102,7 +102,9 @@ export struct ReportPage {
           .margin({ top: 20 })
           .onClick(() => {
             const result = EventWorkflowService.reportHazard({
-              title: '隐患上报',
+              // 标题由隐患描述自动派生（前15字+省略号），无需学生单独填写；空描述时返回占位标题，
+              // 但 reportHazard 的必填校验仍会拦截空描述返回 undefined，下方 toast 提示不变
+              title: EventWorkflowService.buildSummaryTitle(this.description),
               type: this.typeValues[this.selectedTypeIndex],
               location: this.location,
               description: this.description,
