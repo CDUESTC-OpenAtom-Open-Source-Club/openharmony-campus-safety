@@ -7,7 +7,6 @@ import { EventService } from '../service/EventService';
 @Component
 export struct EventPage {
   @Prop pageStack: NavPathStack;
-
   @State private events: SecurityEvent[] =
     EventService.getAllEvents();
 
@@ -79,7 +78,7 @@ export struct EventPage {
           })
         })
       }
-      .layoutWeight(1)
+      .height('100%')
       .width('100%')
       .padding({
         left: 16,
