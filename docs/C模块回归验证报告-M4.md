@@ -40,15 +40,15 @@ M4 验收标准：测试通过 + 回归验证报告。
 
 命令：`hvigorw :entry:test`（含 5 个测试套件，全部注册于 `List.test.ets`）。
 
-**结果：`Tests run: 51, Failure: 0, Error: 0, Pass: 51`（全部通过）**
+**结果：`Tests run: 61, Failure: 0, Error: 0, Pass: 61`（全部通过）**
 
 | 测试套件 | 覆盖内容 | 用例数 |
 |---|---|---|
-| localUnitTest | 既有基础用例 | — |
-| eventSimulatorTest | 事件模拟器：ID 唯一、字段完整、模板覆盖 | — |
-| eventRepositoryTest | Repository 读写 / 更新 / 删除 / 防重复 | — |
-| eventWorkflowTest（新增 9） | 模拟入库 → 确认 → 派单 → 处理 → 完成 全流程状态机 | 9 |
-| stabilityTest（新增 9） | 重启恢复、大批量、重复操作幂等、异常隔离 | 9 |
+| localUnitTest | 既有基础用例 | 1 |
+| eventSimulatorTest | 事件模拟器：ID 唯一、字段完整、模板覆盖、非法参数兜底 | 10 |
+| eventRepositoryTest | Repository 读写 / 更新 / 删除 / 防重复 / 种子幂等 / 写穿落盘 | 21 |
+| eventWorkflowTest | 模拟入库 → 确认 → 派单 → 处理 → 完成 全流程状态机 + 隐患上报 `reportHazard` + `buildSummaryTitle` 标题派生/兜底 | 20 |
+| stabilityTest | 重启恢复、大批量、重复操作幂等、异常隔离 | 9 |
 
 ### 3.3 第三级：应用运行测试（构建验证）
 
@@ -88,9 +88,28 @@ APK 内容核验（unzip / aapt）：
 | 查询不存在 / 空列表 / 非法参数 | `workflow_simulate_and_enqueue_batch_invalid_count_noop`、`stability_invalid_template_does_not_block_followups` |
 | 大批量后业务流程仍正常 | `stability_large_batch_then_workflow_still_runs` |
 
+### 3.5 隐患上报标题修复验证（2026-08-27，鸿蒙模拟器）
+
+用户报告"安全事件列表中事件标题显示为占位词'隐患上报'而非真实标题"。根因：`ReportPage.ets` 提交时硬编码 `title: '隐患上报'`，且 C 数据层 `reportHazard` 未对占位标题兜底。
+
+修复（登记 [C跨模块对接.md](C跨模块对接.md) M4 表第 6 条）：
+
+- `EventWorkflowService.buildSummaryTitle(description)`：描述摘要（前 15 字 + 省略号，折叠换行、按 Unicode 码点截取）；
+- `ReportPage.ets` 提交时用 `buildSummaryTitle(description)` 派生 title；
+- `reportHazard` 兜底：调用方仍传占位标题时自动用描述摘要替换。
+
+端侧实锤验证（模拟器手动提交隐患 → hilog 落库日志）：
+
+```text
+EventWorkflow reportHazard saved: id=EVT1787847210594001 title=操场西侧路灯灯罩脱落电线裸露下… location=操场西侧 status=待确认
+```
+
+落库 `title` 为描述摘要（非"隐患上报"），问题 1 已解决。新增 10 条单测（`reportHazard` 4 条 + `buildSummaryTitle` 5 条 + 占位标题兜底 1 条）随 M4 一并通过。
+
 ## 4. 验证结论
 
-- 单测：51/51 全部通过，流程状态机与稳定性场景全覆盖。
+- 单测：61/61 全部通过，流程状态机、隐患上报与稳定性场景全覆盖。
+- 隐患上报标题修复：模拟器 hilog 实锤落库 title=描述摘要（非占位词），问题 1 已解决。
 - 鸿蒙侧 HAP 构建成功；Android 跨端 APK 构建成功且产物核验完整。
 - ArkData（relationalStore）跨端可用性得到构建级验证（.so 已入包）。
 - 未发现 A/B 文件被越界修改。
@@ -112,7 +131,7 @@ APK 内容核验（unzip / aapt）：
 | RDB 建表 | `run-as` 拉取 `files/database/rdb/campus_safety.db` 核对 | ✅ `security_event` / `task` 表结构正确，枚举以中文落库（待确认/已确认/处理中/已完成） |
 | 种子数据落盘 | 同上 | ✅ EVT001（教学楼走廊漏水/待确认/高）、EVT002（已确认/紧急）、EVT003（处理中/中）全部入库 |
 | 重启持久化 | force-stop → am start 重启后重新拉库 | ✅ 种子数据完整保留，`ensureSeeded` 幂等，未重复播种 |
-| 状态流转链路 | 命令行单测 | ✅ 51/51（确认→派单→处理→完成 全流程状态机 + 稳定性） |
+| 状态流转链路 | 命令行单测 | ✅ 61/61（确认→派单→处理→完成 全流程状态机 + 隐患上报 + 稳定性） |
 
 **闪退定位与修复（2026-08-27）：**
 - 现象：22:40 进程 `com.example.hongmengzhian`（pid 13037）`Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x40`，null pointer dereference，backtrace 固定为 `libarkui_android.so (OHOS::Ace::Framework::JSNavPathStack::OnStateChanged()+0)` ← `JsiClass<JSNavPathStack>::MethodCallback` ← `[anon:ArkTS Code]`。
@@ -130,4 +149,4 @@ APK 内容核验（unzip / aapt）：
 
 ## 8. 声明
 
-本报告所有条目均为实际执行并验证的结果：单测输出 `Tests run: 51, Failure: 0, Error: 0, Pass: 51`；gradle 输出 `BUILD SUCCESSFUL in 46s`；APK 由 aapt/unzip 实际核验；Android 真机 Demo 回归（UI 链路）与 C 数据层持久化验证均已在 OPPO A56 5G 真机上实际执行通过。
+本报告所有条目均为实际执行并验证的结果：单测输出 `Tests run: 61, Failure: 0, Error: 0, Pass: 61`；gradle 输出 `BUILD SUCCESSFUL in 46s`；APK 由 aapt/unzip 实际核验；Android 真机 Demo 回归（UI 链路）与 C 数据层持久化验证均已在 OPPO A56 5G 真机上实际执行通过；隐患上报标题修复经鸿蒙模拟器 hilog 实锤（§3.5）。
