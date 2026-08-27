@@ -3,6 +3,7 @@ import { describe, it, beforeEach, expect } from '@ohos/hypium';
 import {
   SecurityEvent,
   EventStatus,
+  EventPriority,
   EventType
 } from '../main/ets/model/SecurityEvent';
 
@@ -186,6 +187,85 @@ export default function eventWorkflowTest() {
       if (task !== undefined) {
         expect(task.status).assertEqual(TaskStatus.COMPLETED);
       }
+    });
+
+    it('workflow_report_hazard_saves_pending_event', 0, () => {
+      const repo = EventRepository.getInstance();
+      const before: number = repo.getEvents().length;
+      const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '楼道应急灯破损',
+        type: EventType.FACILITY,
+        location: '教学楼2层东侧',
+        description: '应急灯外壳破损，灯管裸露',
+        reporter: '张三'
+      });
+      expect(event === undefined).assertFalse();
+      expect(repo.getEvents().length).assertEqual(before + 1);
+      if (event !== undefined) {
+        expect(event.status).assertEqual(EventStatus.PENDING);
+        expect(event.type).assertEqual(EventType.FACILITY);
+        expect(event.location).assertEqual('教学楼2层东侧');
+        expect(event.reporter).assertEqual('张三');
+        expect(repo.getEventById(event.id) === undefined).assertFalse();
+      }
+    });
+
+    it('workflow_report_hazard_trims_and_applies_defaults', 0, () => {
+      const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '  楼道应急灯破损  ',
+        type: EventType.FACILITY,
+        location: ' 教学楼2层东侧 ',
+        description: '应急灯外壳破损，灯管裸露',
+        reporter: '  '
+      });
+      expect(event === undefined).assertFalse();
+      if (event !== undefined) {
+        expect(event.title).assertEqual('楼道应急灯破损');
+        expect(event.location).assertEqual('教学楼2层东侧');
+        expect(event.reporter).assertEqual('学生上报');
+        expect(event.priority).assertEqual(EventPriority.MEDIUM);
+      }
+    });
+
+    it('workflow_report_hazard_missing_required_returns_undefined', 0, () => {
+      const repo = EventRepository.getInstance();
+      const missingLocation: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '隐患上报',
+        type: EventType.OTHER,
+        location: '   ',
+        description: '没有地点'
+      });
+      expect(missingLocation === undefined).assertTrue();
+      const missingDescription: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '隐患上报',
+        type: EventType.OTHER,
+        location: '操场',
+        description: ''
+      });
+      expect(missingDescription === undefined).assertTrue();
+      expect(repo.getEvents().length).assertEqual(0);
+    });
+
+    it('workflow_report_hazard_multiple_submissions_distinct_ids', 0, () => {
+      const repo = EventRepository.getInstance();
+      const first: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '隐患A',
+        type: EventType.CAMPUS,
+        location: '食堂',
+        description: '地面湿滑'
+      });
+      const second: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '隐患B',
+        type: EventType.CAMPUS,
+        location: '操场',
+        description: '器材损坏'
+      });
+      expect(first === undefined).assertFalse();
+      expect(second === undefined).assertFalse();
+      if (first !== undefined && second !== undefined) {
+        expect(first.id === second.id).assertFalse();
+      }
+      expect(repo.getEvents().length).assertEqual(2);
     });
   });
 }

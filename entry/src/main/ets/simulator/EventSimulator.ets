@@ -83,6 +83,20 @@ export class EventSimulator {
     return events;
   }
 
+  /**
+   * 生成全局唯一事件 ID（供业务层创建非模板事件时复用，保证 ID 唯一性）。
+   */
+  static generateEventId(): string {
+    return EventSimulator.generateUniqueId();
+  }
+
+  /**
+   * 格式化上报时间（供业务层创建事件时复用，与模板事件格式保持一致）。
+   */
+  static formatReportTime(date: Date): string {
+    return EventSimulator.formatTime(date);
+  }
+
   private static resolveTemplateIndex(templateIndex?: number): number {
     if (templateIndex !== undefined &&
       Number.isInteger(templateIndex) &&

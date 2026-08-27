@@ -42,8 +42,9 @@
 | # | A/B 文件 | 改动内容 | 原因 | 授权/对齐状态 |
 |---|---|---|---|---|
 | 4 | `entry/src/main/ets/pages/EventPage.ets` | 列表项 `onClick` 中 `pushPath` 用的 `pageStack` 由 `@Prop pageStack: NavPathStack` 改为普通成员变量 `pageStack: NavPathStack = new NavPathStack()`（默认值被 Index 构造参数 `EventPage({ pageStack: this.pageStack })` 覆盖，运行时仍是 Index 的同一实例）。其余逻辑零改动 | ArkUI-X 引擎下 `@Prop` 对 NavPathStack 对象做**深拷贝 + 单向同步**，拷贝副本的 JS 导航栈与原生导航栈状态不一致，副本上 `pushPath` 触发原生空指针崩溃（`JSNavPathStack::OnStateChanged()` SIGSEGV），表现为"进详情页必崩"。改为普通成员变量后真机复现验证通过（首页→列表→详情→确认→生成任务→任务列表 全链路存活） | 已授权（Lycorius03, 2026-08-27，用户指示"把闪退的事给解决了"）+ 已实现 + 已真机验证 |
+| 5 | `entry/src/main/ets/pages/ReportPage.ets` | 隐患上报页从占位空壳改为可提交表单：新增隐患类型 Select、发生地点 TextInput、隐患描述 TextArea、上报人 TextInput（选填），"提交隐患"按钮由无 `onClick` 的静态按钮改为绑定 `EventWorkflowService.reportHazard(...)`。必填项（地点/描述）为空时 toast 提示；提交成功后 toast 反馈事件编号并清空表单。纯前端交互 + 调用 C 新增数据层入口，未引入新依赖 | 用户报告"提交隐患"按钮点击无反应，定位为功能未实现（按钮无 `onClick`）。用户拍板"C 补数据层+授权改页面（推荐）"：数据层 `reportHazard` 属 C 职责，页面表单属 B | 已授权（Lycorius03, 2026-08-27，AskUserQuestion 选择"C 补数据层+授权改页面（推荐）"）+ 已实现（单测随本任务构建验证） |
 
-> 对齐提示（给 A/B）：M4 追加 1 处页面改动（EventPage.ets），仅替换 `pageStack` 的传递方式，不改布局/业务逻辑。该文件为 A 端页面，改动已在本表登记，A/B 联调时如需沿用请同步最新代码。EventService / 数据层对外接口签名不变。
+> 对齐提示（给 A/B）：M4 追加 2 处页面改动（① EventPage.ets 替换 `pageStack` 传递方式，不改布局/业务逻辑；② ReportPage.ets 从占位空壳补全为隐患上报表单）。两处均已在本表登记，A/B 联调时如需沿用请同步最新代码。EventService 对外接口签名不变；数据层仅新增 `EventSimulator.generateEventId/formatReportTime` 公开方法与 `EventWorkflowService.reportHazard`（只增不改，不影响既有调用）。
 
 ---
 
