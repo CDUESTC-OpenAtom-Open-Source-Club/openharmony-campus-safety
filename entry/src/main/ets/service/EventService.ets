@@ -120,11 +120,31 @@ export class EventService {
   }
 
   static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): void {
-    const tasks = EventRepository.getInstance().getAllTasks();
-    const task = tasks.find((t: Task) => t.id === taskId);
-    if (task !== undefined) {
-      task.status = status;
-      EventRepository.getInstance().saveTask(task);
+    const repository = EventRepository.getInstance();
+    const task = repository.getAllTasks().find((t: Task) => t.id === taskId);
+    if (task === undefined) {
+      return;
+    }
+    // 已完成任务不允许回退，保证流程单向推进
+    if (task.status === TaskStatus.COMPLETED && status !== TaskStatus.COMPLETED) {
+      return;
+    }
+    task.status = status;
+    repository.saveTask(task);
+
+    // 状态联动：任务推进时同步事件状态，保持业务闭环状态一致
+    const event = repository.getEventById(task.eventId);
+    if (event !== undefined) {
+      if (status === TaskStatus.COMPLETED) {
+        event.status = EventStatus.COMPLETED;
+        repository.updateEvent(event);
+      } else if (status === TaskStatus.PROCESSING) {
+        // 仅向前推进：已完成事件不因任务状态回退而降级
+        if (event.status === EventStatus.PENDING || event.status === EventStatus.CONFIRMED) {
+          event.status = EventStatus.PROCESSING;
+          repository.updateEvent(event);
+        }
+      }
     }
   }
 

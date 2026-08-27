@@ -4,7 +4,7 @@
 > 原则：C 不改 A/B；以下条目均为 Lycorius03 明确授权的最小必要改动。
 > 任何未在本表登记的 A/B 文件改动视为越界，不得提交。
 
-## 当前分支：feature/C-repository（M2 已实现，云手机重启恢复验证待 Lycorius03 执行）
+## 当前分支：feature/C-event-workflow（M3 业务闭环）
 
 ---
 
@@ -27,6 +27,16 @@
 
 ---
 
+## M3：业务闭环（feature/C-event-workflow）
+
+| # | A/B 文件 | 改动内容 | 原因 | 授权/对齐状态 |
+|---|---|---|---|---|
+| 3 | `entry/src/main/ets/service/EventService.ets` | `updateTaskStatus(taskId, status, result?)` 在保存任务状态后增加**事件状态联动**：任务置 PROCESSING 且事件为 PENDING/CONFIRMED 时，事件同步置 PROCESSING；任务置 COMPLETED 时事件直接置 COMPLETED。另增加防回退守卫：已完成任务不允许回退到其他状态，事件"已完成"不因任务回退而降级 | 补齐"处理 → 完成"环节的状态一致性，让任务推进能带动事件状态走完整闭环（确认 → 处理中 → 已完成）；`result` 参数因 Task 模型暂无结果字段，维持现状不落库 | 已授权（Lycorius03, 2026-08-27，M3 决策确认"任务完成时事件直接置 COMPLETED"）+ 已实现 |
+
+> 对齐提示（给 A/B）：M3 只改以上 1 个 A 文件，页面文件一个不动。EventService 对外方法签名不变，页面调用无需任何改动；`updateTaskStatus` 联动后，B 端巡检处理任务时事件状态会自动同步，无需额外处理。
+
+---
+
 ## 待对齐事项
 
 - （暂无）
@@ -36,3 +46,4 @@
 ## 已归档条目
 
 - M1（feature/C-event-simulator）：无 A/B 文件改动（仅 C 范围：simulator + test）。2026-08-26 已快进合入 main（2074da1），11 条单测通过。
+- M2（feature/C-repository）：上述 M2 表 2 项已实现并合入 main（fe84bdb，2026-08-27），云手机重启恢复验证待 Lycorius03 执行。
