@@ -10,9 +10,7 @@ import { EventService } from '../service/EventService';
 @Component
 export struct EventDetailPage {
   @State private eventId: string = EventService.getSelectedEventId();
-
   @State private isConfirmed: boolean = false;
-
   @State private taskGenerated: boolean = false;
 
   build() {

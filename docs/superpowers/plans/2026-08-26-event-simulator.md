@@ -1,6 +1,6 @@
 # Event Simulator (M1) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 新增 C 模块事件模拟器 `EventSimulator`，能稳定生成标准化 `SecurityEvent`（ID 唯一、字段完整、默认 `待确认` 状态），覆盖现有 `EventType`，并通过 Hypium 单元测试验证。
 
@@ -37,7 +37,7 @@
 - Create: `entry/src/main/ets/simulator/EventSimulator.ets`
 - Modify: `entry/src/test/List.test.ets`
 
-- [ ] **Step 1: 写失败测试（字段完整 + 默认状态 + 指定类型）**
+- [x] **Step 1: 写失败测试（字段完整 + 默认状态 + 指定类型）**
 
 创建 `entry/src/test/EventSimulator.test.ets`：
 
@@ -92,7 +92,7 @@ export default function eventSimulatorTest() {
 }
 ```
 
-- [ ] **Step 2: 注册测试套件**
+- [x] **Step 2: 注册测试套件**
 
 修改 `entry/src/test/List.test.ets`，追加导入与调用：
 
@@ -106,7 +106,7 @@ export default function testsuite() {
 }
 ```
 
-- [ ] **Step 3: 实现最小可用 EventSimulator（含模板、唯一 ID、时间格式化）**
+- [x] **Step 3: 实现最小可用 EventSimulator（含模板、唯一 ID、时间格式化）**
 
 创建 `entry/src/main/ets/simulator/EventSimulator.ets`：
 
@@ -205,12 +205,12 @@ export class EventSimulator {
 }
 ```
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 在 DevEco Studio 中打开项目 → 对 `entry` 模块运行 **Local Unit Test**（Test Runner 执行 `entry/src/test`）→ 预期 `EventSimulatorTest` 的 4 条用例全部通过，无编译错误。
 （若后续配置了命令行 `hvigorw`，等价命令：`hvigorw test`。）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add entry/src/main/ets/simulator/EventSimulator.ets entry/src/test/EventSimulator.test.ets entry/src/test/List.test.ets
@@ -227,7 +227,7 @@ git commit -m "feat: add event simulator core generation"
 - Modify: `entry/src/main/ets/simulator/EventSimulator.ets`
 - Modify: `entry/src/test/EventSimulator.test.ets`
 
-- [ ] **Step 1: 写失败测试（批量数量 + ID 唯一）**
+- [x] **Step 1: 写失败测试（批量数量 + ID 唯一）**
 
 在 `entry/src/test/EventSimulator.test.ets` 的 `describe` 内追加两个用例：
 
@@ -247,11 +247,11 @@ git commit -m "feat: add event simulator core generation"
     });
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 DevEco Studio → entry 模块 Local Unit Test → 预期编译/运行报错（`simulateBatch` 尚未定义），用例失败。
 
-- [ ] **Step 3: 实现 `simulateBatch`**
+- [x] **Step 3: 实现 `simulateBatch`**
 
 在 `EventSimulator` 类内、`simulateEvent` 之后新增：
 
@@ -272,11 +272,11 @@ DevEco Studio → entry 模块 Local Unit Test → 预期编译/运行报错（`
   }
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 DevEco Studio → entry 模块 Local Unit Test → 预期 `EventSimulatorTest` 全部用例（含新增 2 条）通过，`simulateBatch` 返回数量正确、50 条事件 ID 无重复。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add entry/src/main/ets/simulator/EventSimulator.ets entry/src/test/EventSimulator.test.ets
@@ -290,7 +290,7 @@ git commit -m "feat: add batch simulation with unique ids"
 **Files:**
 - Modify: `entry/src/test/EventSimulator.test.ets`
 
-- [ ] **Step 1: 写失败测试（负数量 / 零数量 / 非法模板索引）**
+- [x] **Step 1: 写失败测试（负数量 / 零数量 / 非法模板索引）**
 
 在 `describe` 内追加：
 
@@ -308,11 +308,11 @@ git commit -m "feat: add batch simulation with unique ids"
     });
 ```
 
-- [ ] **Step 2: 确认测试通过（此阶段校验逻辑已在 Task 1/2 实现）**
+- [x] **Step 2: 确认测试通过（此阶段校验逻辑已在 Task 1/2 实现）**
 
 DevEco Studio → entry 模块 Local Unit Test → 预期 `EventSimulatorTest` 全部用例（含新增 2 条）通过。负/零数量批量返回空数组，非法模板索引回退随机模板且字段仍完整。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add entry/src/test/EventSimulator.test.ets
@@ -326,15 +326,15 @@ git commit -m "test: cover simulator error input handling"
 **Files:**
 - 无新增文件（仅验证）
 
-- [ ] **Step 1: 全量测试回归**
+- [x] **Step 1: 全量测试回归**
 
 DevEco Studio → entry 模块 Local Unit Test → 预期 `EventSimulatorTest` 全部 8 条用例通过，`LocalUnitTest` 原有用例不受影响。
 
-- [ ] **Step 2: 应用编译检查**
+- [x] **Step 2: 应用编译检查**
 
 DevEco Studio → 构建 entry 模块（debug）→ 预期编译成功、无 lint 报错。
 
-- [ ] **Step 3: 边界检查**
+- [x] **Step 3: 边界检查**
 
 ```bash
 git status
@@ -344,7 +344,7 @@ git log -1 --format='author=%an <%ae> / committer=%cn <%ce>'
 
 确认：修改文件仅限 `entry/src/main/ets/simulator/`、`entry/src/test/`（C 范围）；无 A/B 文件被改；身份为 `Lycorius03`。
 
-- [ ] **Step 4: 推送分支**
+- [x] **Step 4: 推送分支**
 
 ```bash
 git push origin feature/C-event-simulator

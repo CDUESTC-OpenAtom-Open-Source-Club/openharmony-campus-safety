@@ -10,12 +10,12 @@ import {
   TaskStatus
 } from '../model/Task';
 
+import { EventRepository } from '../repository/EventRepository';
+
 export class EventService {
   private static selectedEventId: string = '';
 
-  private static tasks: Task[] = [];
-
-  private static events: SecurityEvent[] = [
+  private static seedEvents: SecurityEvent[] = [
     {
       id: 'EVT001',
       title: '教学楼走廊漏水',
@@ -52,20 +52,22 @@ export class EventService {
   ];
 
   static getAllEvents(): SecurityEvent[] {
-    return EventService.events;
+    EventService.ensureSeeded();
+    return EventRepository.getInstance().getEvents();
   }
 
   static getPendingEvents(): SecurityEvent[] {
-    return EventService.events.filter(
+    EventService.ensureSeeded();
+    return EventRepository.getInstance().getEvents().filter(
       (event: SecurityEvent) => event.status === EventStatus.PENDING
     );
   }
 
   static getEventById(id: string): SecurityEvent | undefined {
-    return EventService.events.find(
-      (event: SecurityEvent) => event.id === id
-    );
+    EventService.ensureSeeded();
+    return EventRepository.getInstance().getEventById(id);
   }
+
   static setSelectedEventId(id: string): void {
     EventService.selectedEventId = id;
   }
@@ -79,6 +81,7 @@ export class EventService {
 
     if (event !== undefined) {
       event.status = EventStatus.CONFIRMED;
+      EventRepository.getInstance().updateEvent(event);
     }
   }
 
@@ -89,29 +92,43 @@ export class EventService {
       return;
     }
 
-    const existingTask = EventService.tasks.find(
-      (task: Task) => task.eventId === id
-    );
+    const existingTask = EventRepository.getInstance().getTaskByEventId(id);
 
     if (existingTask !== undefined) {
       return;
     }
 
     const newTask: Task = {
-      id: 'TASK' + (EventService.tasks.length + 1).toString().padStart(3, '0'),
+      id: 'TASK' + (EventRepository.getInstance().getAllTasks().length + 1).toString().padStart(3, '0'),
       eventId: event.id,
       title: event.title,
       location: event.location,
       description: event.description,
-      assignee: '待分配',
+      assignee: 'inspector_001',
       createTime: event.reportTime,
       status: TaskStatus.PENDING
     };
 
-    EventService.tasks.push(newTask);
+    EventRepository.getInstance().saveTask(newTask);
   }
 
   static getAllTasks(): Task[] {
-    return EventService.tasks;
+    return EventRepository.getInstance().getAllTasks();
+  }
+  static getMyTaskList(userId: string): Task[] {
+    return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
+  }
+
+  static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): void {
+    const tasks = EventRepository.getInstance().getAllTasks();
+    const task = tasks.find((t: Task) => t.id === taskId);
+    if (task !== undefined) {
+      task.status = status;
+      EventRepository.getInstance().saveTask(task);
+    }
+  }
+
+  private static ensureSeeded(): void {
+    EventRepository.getInstance().seedIfEmpty(EventService.seedEvents);
   }
 }
