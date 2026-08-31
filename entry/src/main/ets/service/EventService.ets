@@ -121,31 +121,70 @@ export class EventService {
 
   static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): void {
     const repository = EventRepository.getInstance();
-    const task = repository.getAllTasks().find((t: Task) => t.id === taskId);
+
+    const task = repository.getAllTasks().find(
+      (t: Task) => t.id === taskId
+    );
+
     if (task === undefined) {
       return;
     }
-    // 已完成任务不允许回退，保证流程单向推进
-    if (task.status === TaskStatus.COMPLETED && status !== TaskStatus.COMPLETED) {
+
+    // 已完成任务不允许回退
+    if (task.status === TaskStatus.COMPLETED &&
+      status !== TaskStatus.COMPLETED) {
       return;
     }
+
+    // 更新任务状态
     task.status = status;
+
+    // 如果传入了处理结果，就保存处理结果
+    if (result !== undefined) {
+      task.result = result;
+    }
+
+    // 如果任务完成，记录完成时间
+    if (status === TaskStatus.COMPLETED) {
+      task.completedTime = EventService.getCurrentTime();
+    }
+
+    // 保存任务
     repository.saveTask(task);
 
-    // 状态联动：任务推进时同步事件状态，保持业务闭环状态一致
+    // 状态联动：任务完成后，对应安全事件也完成
     const event = repository.getEventById(task.eventId);
+
     if (event !== undefined) {
       if (status === TaskStatus.COMPLETED) {
         event.status = EventStatus.COMPLETED;
         repository.updateEvent(event);
       } else if (status === TaskStatus.PROCESSING) {
-        // 仅向前推进：已完成事件不因任务状态回退而降级
-        if (event.status === EventStatus.PENDING || event.status === EventStatus.CONFIRMED) {
+
+        // 仅向前推进
+        if (event.status === EventStatus.PENDING ||
+          event.status === EventStatus.CONFIRMED) {
+
           event.status = EventStatus.PROCESSING;
           repository.updateEvent(event);
         }
       }
     }
+  }
+
+  private static getCurrentTime(): string {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+
+    const hour = now.getHours().toString().padStart(2, '0');
+    const minute = now.getMinutes().toString().padStart(2, '0');
+    const second = now.getSeconds().toString().padStart(2, '0');
+
+    return year + '-' + month + '-' + day +
+      ' ' + hour + ':' + minute + ':' + second;
   }
 
   private static ensureSeeded(): void {
