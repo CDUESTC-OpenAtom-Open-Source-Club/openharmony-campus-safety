@@ -13,4 +13,10 @@ export interface Task {
   assignee: string;
   createTime: string;
   status: TaskStatus;
+
+  // 巡检人员填写的处理结果
+  result?: string;
+
+  // 任务完成时间
+  completedTime?: string;
 }
