@@ -1,5 +1,8 @@
 import {
-  SecurityEvent
+  SecurityEvent,
+  EventStatus,
+  EventPriority,
+  EventType
 } from '../model/SecurityEvent';
 import {
   Task,
@@ -21,16 +24,6 @@ export struct StatisticsPage {
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
 
-  private bars: BarItem[] = [
-    { day: '周一', value: 4, height: '40%' },
-    { day: '周二', value: 6, height: '60%' },
-    { day: '周三', value: 3, height: '30%' },
-    { day: '周四', value: 8, height: '80%' },
-    { day: '周五', value: 5, height: '50%' },
-    { day: '周六', value: 2, height: '20%' },
-    { day: '周日', value: 7, height: '70%' }
-  ];
-
   private getPendingTaskCount(): number {
     return this.tasks.filter(
       (task: Task) =>
@@ -43,6 +36,137 @@ export struct StatisticsPage {
     return this.tasks.filter(
       (task: Task) => task.status === TaskStatus.COMPLETED
     ).length;
+  }
+
+  private getHealthScore(): number {
+    let penalty: number = 0;
+    this.events.forEach((event: SecurityEvent) => {
+      if (
+        event.status === EventStatus.PENDING ||
+        event.status === EventStatus.CONFIRMED
+      ) {
+        if (event.priority === EventPriority.URGENT) {
+          penalty += 18;
+        } else if (event.priority === EventPriority.HIGH) {
+          penalty += 12;
+        } else if (event.priority === EventPriority.MEDIUM) {
+          penalty += 8;
+        } else {
+          penalty += 4;
+        }
+      } else if (event.status === EventStatus.PROCESSING) {
+        penalty += 4;
+      }
+    });
+    this.tasks.forEach((task: Task) => {
+      if (task.status === TaskStatus.PENDING) {
+        penalty += 6;
+      } else if (task.status === TaskStatus.PROCESSING) {
+        penalty += 3;
+      }
+    });
+    const score: number = Math.max(55, Math.min(100, 100 - penalty));
+    return Math.round(score * 10) / 10;
+  }
+
+  private getHealthGrade(score: number): string {
+    if (score >= 95) {
+      return 'A+';
+    } else if (score >= 90) {
+      return 'A';
+    } else if (score >= 80) {
+      return 'B';
+    } else if (score >= 70) {
+      return 'C';
+    }
+    return 'D';
+  }
+
+  private parseTime(value: string): number {
+    const datePart: string = value.split(' ')[0];
+    const timePart: string = value.split(' ').length > 1 ? value.split(' ')[1] : '';
+    const d: string[] = datePart.split('-');
+    const t: string[] = timePart === '' ? ['0', '0', '0'] : timePart.split(':');
+    const year: number = Number(d[0]);
+    const month: number = Number(d[1]) - 1;
+    const day: number = Number(d[2]);
+    const hour: number = t.length > 0 ? Number(t[0]) : 0;
+    const minute: number = t.length > 1 ? Number(t[1]) : 0;
+    const second: number = t.length > 2 ? Number(t[2]) : 0;
+    return new Date(year, month, day, hour, minute, second).getTime();
+  }
+
+  private getAverageResponse(): string {
+    let totalMinutes: number = 0;
+    let count: number = 0;
+    this.tasks.forEach((task: Task) => {
+      if (
+        task.status === TaskStatus.COMPLETED &&
+        task.createTime !== '' &&
+        task.completedTime !== undefined &&
+        task.completedTime !== ''
+      ) {
+        const start: number = this.parseTime(task.createTime);
+        const end: number = this.parseTime(task.completedTime);
+        if (start > 0 && end > start) {
+          totalMinutes += Math.round((end - start) / 60000);
+          count++;
+        }
+      }
+    });
+    if (count === 0) {
+      return '暂无处置记录';
+    }
+    return Math.round(totalMinutes / count).toString() + ' 分钟';
+  }
+
+  private getDomainRate(type: EventType): number {
+    const domainEvents: SecurityEvent[] = this.events.filter(
+      (event: SecurityEvent) => event.type === type
+    );
+    if (domainEvents.length === 0) {
+      return 100;
+    }
+    const closed: number = domainEvents.filter(
+      (event: SecurityEvent) => event.status === EventStatus.COMPLETED
+    ).length;
+    return Math.round(closed / domainEvents.length * 100);
+  }
+
+  private isSameDay(reportTime: string, date: Date): boolean {
+    if (reportTime === '') {
+      return false;
+    }
+    const datePart: string = reportTime.split(' ')[0];
+    const d: string[] = datePart.split('-');
+    return Number(d[0]) === date.getFullYear() &&
+      Number(d[1]) === date.getMonth() + 1 &&
+      Number(d[2]) === date.getDate();
+  }
+
+  private getLast7Days(): BarItem[] {
+    const items: BarItem[] = [];
+    const today: Date = new Date();
+    const weekdays: string[] = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    let maxValue: number = 1;
+    for (let i = 6; i >= 0; i--) {
+      const day: Date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const count: number = this.events.filter(
+        (event: SecurityEvent) => this.isSameDay(event.reportTime, day)
+      ).length;
+      if (count > maxValue) {
+        maxValue = count;
+      }
+      items.push({
+        day: weekdays[day.getDay()],
+        value: count,
+        height: '0%'
+      });
+    }
+    items.forEach((item: BarItem) => {
+      item.height = Math.round(item.value / maxValue * 100).toString() + '%';
+    });
+    return items;
   }
 
   private refreshData(): void {
@@ -94,11 +218,11 @@ export struct StatisticsPage {
 
       Scroll() {
         Column({ space: 12 }) {
-          // 综合评分卡片
+          // 实时健康度卡片
           Column() {
             Row() {
               Column() {
-                Text('实时健康度 A+')
+                Text('实时健康度 ' + this.getHealthGrade(this.getHealthScore()))
                   .fontSize(10)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#6EE7B7')
@@ -118,7 +242,7 @@ export struct StatisticsPage {
               Blank()
 
               Column() {
-                Text('98.5')
+                Text(this.getHealthScore().toString())
                   .fontSize(14)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#6EE7B7')
@@ -132,7 +256,7 @@ export struct StatisticsPage {
             .width('100%')
             .margin({ bottom: 10 })
 
-            Text('联动巡检网格、物业电工与安保中队，平均响应 4.8 分钟')
+            Text('平均响应：' + this.getAverageResponse())
               .fontSize(11)
               .fontColor('rgba(255,255,255,0.65)')
               .width('100%')
@@ -146,7 +270,7 @@ export struct StatisticsPage {
           })
           .shadow({ radius: 16, color: 'rgba(15,23,42,0.25)', offsetY: 6 })
 
-          // 三项指标
+          // 三项实时指标
           Row({ space: 8 }) {
             Column() {
               Text('安全事件')
@@ -210,7 +334,7 @@ export struct StatisticsPage {
           }
           .width('100%')
 
-          // 达标率分布
+          // 各领域达标率（按真实事件闭环率计算）
           Column({ space: 12 }) {
             Row() {
               Text('各重点安防领域达标率')
@@ -218,7 +342,7 @@ export struct StatisticsPage {
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#334155')
               Blank()
-              Text('本周动态')
+              Text('实时计算')
                 .fontSize(10)
                 .fontColor('#94A3B8')
             }
@@ -230,7 +354,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text('92%')
+                Text(this.getDomainRate(EventType.FIRE).toString() + '%')
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -239,7 +363,7 @@ export struct StatisticsPage {
 
               Row() {
                 Row()
-                  .width('92%')
+                  .width(this.getDomainRate(EventType.FIRE).toString() + '%')
                   .height(8)
                   .borderRadius(4)
                   .backgroundColor('#2563EB')
@@ -257,7 +381,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text('96%')
+                Text(this.getDomainRate(EventType.ELECTRIC).toString() + '%')
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -266,7 +390,7 @@ export struct StatisticsPage {
 
               Row() {
                 Row()
-                  .width('96%')
+                  .width(this.getDomainRate(EventType.ELECTRIC).toString() + '%')
                   .height(8)
                   .borderRadius(4)
                   .backgroundColor('#10B981')
@@ -284,7 +408,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text('88%')
+                Text(this.getDomainRate(EventType.FACILITY).toString() + '%')
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -293,7 +417,7 @@ export struct StatisticsPage {
 
               Row() {
                 Row()
-                  .width('88%')
+                  .width(this.getDomainRate(EventType.FACILITY).toString() + '%')
                   .height(8)
                   .borderRadius(4)
                   .backgroundColor('#F59E0B')
@@ -311,7 +435,7 @@ export struct StatisticsPage {
           .backgroundColor(Color.White)
           .border({ width: 1, color: '#E2E8F0' })
 
-          // 近 7 日柱状图
+          // 近 7 日事件趋势（按实际报告时间统计）
           Column() {
             Row() {
               Text('近 7 日事件办结趋势')
@@ -319,7 +443,7 @@ export struct StatisticsPage {
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#334155')
               Blank()
-              Text('环比提升 12%')
+              Text('实时')
                 .fontSize(10)
                 .fontWeight(FontWeight.Medium)
                 .fontColor('#059669')
@@ -328,7 +452,7 @@ export struct StatisticsPage {
             .margin({ bottom: 10 })
 
             Row() {
-              ForEach(this.bars, (item: BarItem) => {
+              ForEach(this.getLast7Days(), (item: BarItem) => {
                 Column() {
                   Text(item.value.toString())
                     .fontSize(9)

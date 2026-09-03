@@ -195,7 +195,7 @@ export struct ReportPage {
             .width('100%')
 
             TextInput({
-              placeholder: '例如：明德楼3楼东侧走廊',
+              placeholder: '请输入发生地点',
               text: this.location
             })
               .width('100%')
@@ -252,7 +252,7 @@ export struct ReportPage {
             .width('100%')
 
             TextArea({
-              placeholder: '请详细说明现场隐患现象（如冒烟、漏水、通道受阻等）...',
+              placeholder: '请详细说明现场隐患现象',
               text: this.description
             })
               .width('100%')
