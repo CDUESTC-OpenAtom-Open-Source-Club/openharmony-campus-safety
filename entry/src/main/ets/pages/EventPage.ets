@@ -18,6 +18,7 @@ export struct EventPage {
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private searchQuery: string = '';
   @State private filterPriority: string = 'ALL';
+  @State private filterStatus: string = 'ALL';
 
   private filters: PriorityFilter[] = [
     { id: 'ALL', label: '全部' },
@@ -25,6 +26,14 @@ export struct EventPage {
     { id: '高', label: '较高' },
     { id: '中', label: '中等' },
     { id: '低', label: '普通' }
+  ];
+
+  private statusFilters: PriorityFilter[] = [
+    { id: 'ALL', label: '全部状态' },
+    { id: '待确认', label: '待确认' },
+    { id: '已确认', label: '已确认' },
+    { id: '处理中', label: '处理中' },
+    { id: '已完成', label: '已完成' }
   ];
 
   private getPriorityBg(priority: EventPriority): string {
@@ -67,12 +76,14 @@ export struct EventPage {
     return this.events.filter((event: SecurityEvent) => {
       const matchPriority: boolean =
         this.filterPriority === 'ALL' || event.priority === this.filterPriority;
+      const matchStatus: boolean =
+        this.filterStatus === 'ALL' || event.status === this.filterStatus;
       const matchSearch: boolean =
         query === '' ||
         event.title.toLowerCase().includes(query) ||
         event.location.toLowerCase().includes(query) ||
         event.id.toLowerCase().includes(query);
-      return matchPriority && matchSearch;
+      return matchPriority && matchStatus && matchSearch;
     });
   }
 
@@ -145,6 +156,27 @@ export struct EventPage {
                 .backgroundColor(this.filterPriority === item.id ? '#2563EB' : '#F1F5F9')
                 .onClick(() => {
                   this.filterPriority = item.id;
+                })
+            }, (item: PriorityFilter) => item.id)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .scrollable(ScrollDirection.Horizontal)
+
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(this.statusFilters, (item: PriorityFilter) => {
+              Text(item.label)
+                .fontSize(11)
+                .fontWeight(this.filterStatus === item.id ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(this.filterStatus === item.id ? Color.White : '#64748B')
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .borderRadius(14)
+                .backgroundColor(this.filterStatus === item.id ? '#334155' : '#F1F5F9')
+                .onClick(() => {
+                  this.filterStatus = item.id;
                 })
             }, (item: PriorityFilter) => item.id)
           }

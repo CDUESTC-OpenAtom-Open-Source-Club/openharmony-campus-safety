@@ -45,6 +45,11 @@ export struct StatisticsPage {
     ).length;
   }
 
+  private refreshData(): void {
+    this.events = EventService.getAllEvents().slice();
+    this.tasks = EventService.getAllTasks().slice();
+  }
+
   build() {
     Column() {
       // 顶部标题栏
@@ -69,6 +74,19 @@ export struct StatisticsPage {
             .margin({ top: 2 })
         }
         .alignItems(HorizontalAlign.Start)
+
+        Blank()
+
+        Text('刷新')
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#2563EB')
+          .padding({ left: 11, right: 11, top: 5, bottom: 5 })
+          .borderRadius(12)
+          .backgroundColor('#EFF6FF')
+          .onClick(() => {
+            this.refreshData();
+          })
       }
       .width('100%')
       .padding({ left: 12, right: 16, top: 14, bottom: 10 })

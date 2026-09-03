@@ -1,4 +1,7 @@
-import { EventType } from '../model/SecurityEvent';
+import {
+  EventType,
+  EventPriority
+} from '../model/SecurityEvent';
 import { EventWorkflowService } from '../service/EventWorkflowService';
 import { promptAction } from '@kit.ArkUI';
 
@@ -16,6 +19,7 @@ export struct ReportPage {
 
   @State private pageReady: boolean = false;
   @State private selectedTypeIndex: number = 0;
+  @State private selectedPriorityIndex: number = 1;
   @State private location: string = '';
   @State private description: string = '';
   @State private reporter: string = '';
@@ -37,6 +41,13 @@ export struct ReportPage {
     '东区体育馆'
   ];
 
+  private priorityValues: EventPriority[] = [
+    EventPriority.URGENT,
+    EventPriority.HIGH,
+    EventPriority.MEDIUM,
+    EventPriority.LOW
+  ];
+
   private submit(): void {
     if (this.location.trim() === '' || this.description.trim() === '') {
       promptAction.showToast({ message: '请填写发生地点和隐患描述' });
@@ -47,7 +58,8 @@ export struct ReportPage {
       type: this.typeCards[this.selectedTypeIndex].type,
       location: this.location,
       description: this.description,
-      reporter: this.reporter
+      reporter: this.reporter,
+      priority: this.priorityValues[this.selectedPriorityIndex]
     });
     if (result === undefined) {
       promptAction.showToast({ message: '请填写发生地点和隐患描述' });
@@ -126,6 +138,48 @@ export struct ReportPage {
           .backgroundColor(Color.White)
           .border({ width: 1, color: '#E2E8F0' })
           .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+
+          // 隐患等级
+          Column({ space: 8 }) {
+            Row() {
+              Text('隐患等级')
+                .fontSize(11)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#334155')
+              Text('（用于评估处置优先级）')
+                .fontSize(10)
+                .fontColor('#94A3B8')
+                .margin({ left: 4 })
+            }
+            .width('100%')
+
+            Row({ space: 8 }) {
+              ForEach(this.priorityValues, (priority: EventPriority, index: number) => {
+                Text(priority)
+                  .fontSize(11)
+                  .fontWeight(this.selectedPriorityIndex === index ? FontWeight.Bold : FontWeight.Normal)
+                  .fontColor(this.selectedPriorityIndex === index ? Color.White : '#475569')
+                  .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+                  .borderRadius(12)
+                  .backgroundColor(
+                    this.selectedPriorityIndex === index
+                      ? (priority === EventPriority.URGENT || priority === EventPriority.HIGH ? '#DC2626' : '#2563EB')
+                      : '#F1F5F9'
+                  )
+                  .layoutWeight(1)
+                  .textAlign(TextAlign.Center)
+                  .onClick(() => {
+                    this.selectedPriorityIndex = index;
+                  })
+              }, (priority: EventPriority) => priority)
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(18)
+          .backgroundColor(Color.White)
+          .border({ width: 1, color: '#E2E8F0' })
 
           // 发生地点
           Column({ space: 8 }) {

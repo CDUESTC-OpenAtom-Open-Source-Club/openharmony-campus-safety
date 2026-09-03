@@ -116,6 +116,7 @@ struct Index {
       }
       .title('安全事件')
       .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
     } else if (name === 'EventDetailPage') {
       NavDestination() {
         EventDetailPage({
@@ -124,6 +125,7 @@ struct Index {
       }
       .title('事件详情')
       .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
     } else if (name === 'TaskPage') {
       NavDestination() {
         TaskPage({
@@ -132,6 +134,7 @@ struct Index {
       }
       .title('处置任务')
       .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
     } else if (name === 'ReportPage') {
       NavDestination() {
         ReportPage({
@@ -140,6 +143,7 @@ struct Index {
       }
       .title('隐患上报')
       .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
     } else if (name === 'StatisticsPage') {
       NavDestination() {
         StatisticsPage({
@@ -148,6 +152,7 @@ struct Index {
       }
       .title('数据统计')
       .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
     }
   }
 
@@ -580,52 +585,66 @@ struct Index {
               .padding({ left: 18, right: 18, top: 18, bottom: 8 })
 
               Column({ space: 10 }) {
-                ForEach(this.events.slice(0, 2), (event: SecurityEvent) => {
+                if (this.events.length === 0) {
                   Row() {
-                    Row()
-                      .width(8)
-                      .height(8)
-                      .borderRadius(4)
-                      .backgroundColor('#2563EB')
-
-                    Column() {
-                      Text(event.title)
-                        .fontSize(13)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#334155')
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      Text(event.location)
-                        .fontSize(11)
-                        .fontColor('#94A3B8')
-                        .margin({ top: 3 })
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    }
-                    .alignItems(HorizontalAlign.Start)
-                    .layoutWeight(1)
-                    .margin({ left: 10 })
-
-                    Text(event.status)
-                      .fontSize(10)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(this.getStatusColor(event.status))
-                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                      .borderRadius(8)
-                      .backgroundColor('#F8FAFC')
+                    Text('暂无流转事件，等待首次发现')
+                      .fontSize(12)
+                      .fontColor('#94A3B8')
                   }
                   .width('100%')
-                  .padding(12)
+                  .padding(14)
                   .borderRadius(16)
                   .backgroundColor(Color.White)
                   .border({ width: 1, color: '#E2E8F0' })
-                  .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
-                  .onClick(() => {
-                    EventService.setSelectedEventId(event.id);
-                    this.currentTab = 'EventPage';
-                    this.pageStack.pushPath({ name: 'EventDetailPage' });
-                  })
-                }, (event: SecurityEvent) => event.id)
+                  .justifyContent(FlexAlign.Center)
+                } else {
+                  ForEach(this.events.slice(0, 2), (event: SecurityEvent) => {
+                    Row() {
+                      Row()
+                        .width(8)
+                        .height(8)
+                        .borderRadius(4)
+                        .backgroundColor('#2563EB')
+
+                      Column() {
+                        Text(event.title)
+                          .fontSize(13)
+                          .fontWeight(FontWeight.Bold)
+                          .fontColor('#334155')
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        Text(event.location)
+                          .fontSize(11)
+                          .fontColor('#94A3B8')
+                          .margin({ top: 3 })
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      }
+                      .alignItems(HorizontalAlign.Start)
+                      .layoutWeight(1)
+                      .margin({ left: 10 })
+
+                      Text(event.status)
+                        .fontSize(10)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor(this.getStatusColor(event.status))
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .borderRadius(8)
+                        .backgroundColor('#F8FAFC')
+                    }
+                    .width('100%')
+                    .padding(12)
+                    .borderRadius(16)
+                    .backgroundColor(Color.White)
+                    .border({ width: 1, color: '#E2E8F0' })
+                    .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+                    .onClick(() => {
+                      EventService.setSelectedEventId(event.id);
+                      this.currentTab = 'EventPage';
+                      this.pageStack.pushPath({ name: 'EventDetailPage' });
+                    })
+                  }, (event: SecurityEvent) => event.id)
+                }
               }
               .width('100%')
               .padding({ left: 16, right: 16, bottom: 20 })
