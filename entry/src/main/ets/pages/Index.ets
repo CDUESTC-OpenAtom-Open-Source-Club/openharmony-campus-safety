@@ -20,9 +20,9 @@ import { common, Want } from '@kit.AbilityKit';
 @Component
 struct Index {
   private pageStack: NavPathStack = new NavPathStack();
-  private securityPhone: string = '110';
 
   @State private currentTab: string = 'Index';
+  @State private emergencyPhone: string = '';
 
   // 开屏动画控制
   @State private splashVisible: boolean = true;
@@ -489,19 +489,37 @@ struct Index {
               // 24H 保卫处一键求助
               // ========================
               Row() {
-                Row({ space: 6 }) {
-                  Row()
-                    .width(7)
-                    .height(7)
-                    .borderRadius(4)
-                    .backgroundColor('#EF4444')
-                  Text('24H 校园安全应急热线')
-                    .fontSize(12)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#1E293B')
-                }
+                Column({ space: 6 }) {
+                  Row({ space: 6 }) {
+                    Row()
+                      .width(7)
+                      .height(7)
+                      .borderRadius(4)
+                      .backgroundColor('#EF4444')
+                    Text('应急联系方式')
+                      .fontSize(12)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor('#1E293B')
+                  }
+                  .width('100%')
 
-                Blank()
+                  TextInput({
+                    placeholder: '请输入紧急联系电话',
+                    text: this.emergencyPhone
+                  })
+                    .type(InputType.PhoneNumber)
+                    .fontSize(12)
+                    .height(38)
+                    .borderRadius(12)
+                    .backgroundColor('#F8FAFC')
+                    .border({ width: 1, color: '#E2E8F0' })
+                    .padding({ left: 12, right: 12 })
+                    .onChange((value: string) => {
+                      this.emergencyPhone = value;
+                    })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
 
                 Button('一键求助')
                   .type(ButtonType.Normal)
@@ -510,17 +528,32 @@ struct Index {
                   .fontColor('#DC2626')
                   .backgroundColor('#FEF2F2')
                   .borderRadius(14)
-                  .height(34)
+                  .height(38)
                   .padding({ left: 14, right: 14 })
+                  .margin({ left: 10 })
                   .onClick(() => {
+                    const phone = this.emergencyPhone.trim();
+                    if (phone === '') {
+                      promptAction.showToast({ message: '请先填写紧急联系电话' });
+                      return;
+                    }
                     const context = getContext(this) as common.UIAbilityContext;
-                    const want: Want = {
-                      action: 'ohos.want.action.dial',
-                      uri: 'tel:' + this.securityPhone
+                    const body = '鸿蒙智安紧急求助：请立即联系我，谢谢。';
+                    const smsWant: Want = {
+                      action: 'ohos.want.action.sendSms',
+                      uri: 'sms:' + phone + '?body=' + encodeURIComponent(body)
                     };
-                    context.startAbility(want).then(() => {
+                    const dialWant: Want = {
+                      action: 'ohos.want.action.dial',
+                      uri: 'tel:' + phone
+                    };
+                    context.startAbility(smsWant).then(() => {
+                      context.startAbility(dialWant).then(() => {
+                      }).catch((err: Error) => {
+                        promptAction.showToast({ message: '短信已打开，拨号失败，请手动拨打 ' + phone });
+                      });
                     }).catch((err: Error) => {
-                      promptAction.showToast({ message: '无法打开拨号界面，请手动拨打 ' + this.securityPhone });
+                      promptAction.showToast({ message: '无法打开短信界面，请手动联系 ' + phone });
                     });
                   })
               }
