@@ -3,6 +3,7 @@ import { EventDetailPage } from './EventDetailPage';
 import { TaskPage } from './TaskPage';
 import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
+import { EventSimulatorPage } from './SimulatorPage';
 
 @Entry
 @Component
@@ -38,6 +39,14 @@ struct Index {
         StatisticsPage()
       }
       .title('数据统计')
+    } else if (name === 'EventSimulatorPage') {
+      NavDestination() {
+        EventSimulatorPage({
+          pageStack: this.pageStack
+        })
+      }
+      .title('安全事件模拟器')
+      .hideTitleBar(true)
     }
   }
 
@@ -89,6 +98,16 @@ struct Index {
           .onClick(() => {
             this.pageStack.pushPath({
               name: 'StatisticsPage'
+            })
+          })
+
+        Button('安全事件模拟器')
+          .width('80%')
+          .height(50)
+          .margin({ bottom: 16 })
+          .onClick(() => {
+            this.pageStack.pushPath({
+              name: 'EventSimulatorPage'
             })
           })
       }
