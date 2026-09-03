@@ -93,6 +93,37 @@ struct Index {
     return pending.length;
   }
 
+  private getHealthScore(): number {
+    let penalty: number = 0;
+    this.events.forEach((event: SecurityEvent) => {
+      if (
+        event.status === EventStatus.PENDING ||
+        event.status === EventStatus.CONFIRMED
+      ) {
+        if (event.priority === EventPriority.URGENT) {
+          penalty += 18;
+        } else if (event.priority === EventPriority.HIGH) {
+          penalty += 12;
+        } else if (event.priority === EventPriority.MEDIUM) {
+          penalty += 8;
+        } else {
+          penalty += 4;
+        }
+      } else if (event.status === EventStatus.PROCESSING) {
+        penalty += 4;
+      }
+    });
+    this.tasks.forEach((task: Task) => {
+      if (task.status === TaskStatus.PENDING) {
+        penalty += 6;
+      } else if (task.status === TaskStatus.PROCESSING) {
+        penalty += 3;
+      }
+    });
+    const score: number = Math.max(55, Math.min(100, 100 - penalty));
+    return Math.round(score * 10) / 10;
+  }
+
   private getStatusColor(status: EventStatus): string {
     if (status === EventStatus.PENDING) {
       return '#EA580C';
@@ -253,7 +284,7 @@ struct Index {
       this.splashStepText = '连接校园物联网感知网格...';
     }, 400);
     this.timerProgress2 = setTimeout(() => {
-      this.splashStepText = '校验 428 个安防巡检节点...';
+      this.splashStepText = '正在校验安防巡检节点...';
     }, 900);
     this.timerProgress3 = setTimeout(() => {
       this.splashStepText = '鸿蒙智安守护网络已就绪';
@@ -371,7 +402,7 @@ struct Index {
               // ========================
               Column() {
                 Row() {
-                  Text('综合安全指数 99.4')
+                  Text('综合安全指数 ' + this.getHealthScore().toString())
                     .fontSize(11)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(Color.White)
@@ -433,7 +464,7 @@ struct Index {
                 .width('100%')
                 .padding({ top: 10, bottom: 10 })
 
-                Text('全校 428 个安防巡检网格运行正常')
+                Text('当前安防网络运行正常')
                   .fontSize(11)
                   .fontColor('rgba(255,255,255,0.8)')
                   .width('100%')
