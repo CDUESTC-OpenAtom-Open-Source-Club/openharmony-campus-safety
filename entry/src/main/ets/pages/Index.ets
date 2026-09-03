@@ -3,26 +3,46 @@ import { EventDetailPage } from './EventDetailPage';
 import { TaskPage } from './TaskPage';
 import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
+import {
+  SecurityEvent,
+  EventPriority,
+  EventStatus
+} from '../model/SecurityEvent';
+import {
+  Task,
+  TaskStatus
+} from '../model/Task';
+import { EventService } from '../service/EventService';
+import { promptAction } from '@kit.ArkUI';
 
 @Entry
 @Component
 struct Index {
-  /* 【不可改】pageStack 必须保持普通成员变量；不得改为 @State/@Prop 等响应式声明 */
   private pageStack: NavPathStack = new NavPathStack();
 
-  // 开屏动画控制状态
+  @State private currentTab: string = 'Index';
+
+  // 开屏动画控制
   @State private splashVisible: boolean = true;
   @State private splashOpacity: number = 0;
-  @State private splashScale: number = 0.85;
-  @State private splashOffsetY: number = 24;
+  @State private splashScale: number = 0.6;
+  @State private splashOffsetY: number = 20;
   @State private splashProgress: number = 0;
-  // 首页卡片入场动效
+  @State private splashStepText: string = '正在初始化安防引擎...';
+
+  // 首页入场动效
   @State private homeReady: boolean = false;
 
-  // 定时器引用，防止组件销毁后泄漏
+  // 数据
+  @State private events: SecurityEvent[] = EventService.getAllEvents();
+  @State private tasks: Task[] = EventService.getAllTasks();
+
   private timerEnter: number = -1;
   private timerExit: number = -1;
   private timerFinish: number = -1;
+  private timerProgress1: number = -1;
+  private timerProgress2: number = -1;
+  private timerProgress3: number = -1;
 
   aboutToDisappear(): void {
     if (this.timerEnter !== -1) {
@@ -34,9 +54,58 @@ struct Index {
     if (this.timerFinish !== -1) {
       clearTimeout(this.timerFinish);
     }
+    if (this.timerProgress1 !== -1) {
+      clearTimeout(this.timerProgress1);
+    }
+    if (this.timerProgress2 !== -1) {
+      clearTimeout(this.timerProgress2);
+    }
+    if (this.timerProgress3 !== -1) {
+      clearTimeout(this.timerProgress3);
+    }
   }
 
-  /* 【不可改】5 条路由名与标题一字不能改；NavDestination 包装关系不能改 */
+  private navigateTo(name: string): void {
+    this.currentTab = name;
+    if (name === 'Index') {
+      this.pageStack.clear();
+      return;
+    }
+    this.pageStack.clear();
+    this.pageStack.pushPath({ name: name });
+  }
+
+  private getUrgentCount(): number {
+    const urgent: SecurityEvent[] = this.events.filter(
+      (event: SecurityEvent) =>
+        event.priority === EventPriority.URGENT ||
+        event.priority === EventPriority.HIGH
+    );
+    return urgent.length;
+  }
+
+  private getPendingTaskCount(): number {
+    const pending: Task[] = this.tasks.filter(
+      (task: Task) =>
+        task.status === TaskStatus.PENDING ||
+        task.status === TaskStatus.PROCESSING
+    );
+    return pending.length;
+  }
+
+  private getStatusColor(status: EventStatus): string {
+    if (status === EventStatus.PENDING) {
+      return '#EA580C';
+    } else if (status === EventStatus.CONFIRMED) {
+      return '#1B6EFF';
+    } else if (status === EventStatus.PROCESSING) {
+      return '#6366F1';
+    } else if (status === EventStatus.COMPLETED) {
+      return '#16A34A';
+    }
+    return '#64748B';
+  }
+
   @Builder
   pageMap(name: string) {
     if (name === 'EventPage') {
@@ -46,68 +115,240 @@ struct Index {
         })
       }
       .title('安全事件')
+      .hideTitleBar(true)
     } else if (name === 'EventDetailPage') {
       NavDestination() {
-        EventDetailPage()
+        EventDetailPage({
+          pageStack: this.pageStack
+        })
       }
       .title('事件详情')
+      .hideTitleBar(true)
     } else if (name === 'TaskPage') {
       NavDestination() {
-        TaskPage()
+        TaskPage({
+          pageStack: this.pageStack
+        })
       }
       .title('处置任务')
+      .hideTitleBar(true)
     } else if (name === 'ReportPage') {
       NavDestination() {
-        ReportPage()
+        ReportPage({
+          pageStack: this.pageStack
+        })
       }
       .title('隐患上报')
+      .hideTitleBar(true)
     } else if (name === 'StatisticsPage') {
       NavDestination() {
-        StatisticsPage()
+        StatisticsPage({
+          pageStack: this.pageStack
+        })
       }
       .title('数据统计')
+      .hideTitleBar(true)
     }
+  }
+
+  @Builder
+  bentoCard(
+    title: string,
+    desc: string,
+    badge: string,
+    badgeColor: string,
+    iconBg: string,
+    iconColor: string,
+    iconText: string,
+    route: string
+  ) {
+    Column() {
+      Row() {
+        Row() {
+          Text(iconText)
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(iconColor)
+        }
+        .width(42)
+        .height(42)
+        .borderRadius(14)
+        .backgroundColor(iconBg)
+        .justifyContent(FlexAlign.Center)
+
+        Blank()
+
+        Text(badge)
+          .fontSize(10)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(badgeColor)
+          .backgroundColor('#F8FAFC')
+          .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+          .borderRadius(8)
+      }
+      .width('100%')
+      .margin({ bottom: 10 })
+
+      Text(title)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#0F172A')
+        .width('100%')
+
+      Text(desc)
+        .fontSize(11)
+        .fontColor('#94A3B8')
+        .width('100%')
+        .margin({ top: 3 })
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius(18)
+    .backgroundColor(Color.White)
+    .border({ width: 1, color: '#E2E8F0' })
+    .shadow({ radius: 10, color: 'rgba(15,23,42,0.04)', offsetY: 2 })
+    .onClick(() => {
+      this.navigateTo(route);
+    })
+  }
+
+  @Builder
+  tabItem(key: string, label: string, icon: string) {
+    Column() {
+      Text(icon)
+        .fontSize(18)
+        .fontColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
+      Text(label)
+        .fontSize(10)
+        .fontWeight(this.currentTab === key ? FontWeight.Bold : FontWeight.Normal)
+        .fontColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+    .onClick(() => {
+      this.navigateTo(key);
+    })
+  }
+
+  private startSplash(): void {
+    this.getUIContext().animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
+      this.splashOpacity = 1;
+      this.splashScale = 1;
+      this.splashOffsetY = 0;
+    });
+
+    this.timerProgress1 = setTimeout(() => {
+      this.splashProgress = 32;
+      this.splashStepText = '连接校园物联网感知网格...';
+    }, 400);
+    this.timerProgress2 = setTimeout(() => {
+      this.splashProgress = 68;
+      this.splashStepText = '校验 428 个安防巡检节点...';
+    }, 900);
+    this.timerProgress3 = setTimeout(() => {
+      this.splashProgress = 100;
+      this.splashStepText = '鸿蒙智安守护网络已就绪';
+    }, 1450);
+
+    this.timerExit = setTimeout(() => {
+      this.getUIContext().animateTo({ duration: 450, curve: Curve.EaseIn }, () => {
+        this.splashOpacity = 0;
+        this.splashScale = 0.92;
+      });
+    }, 1850);
+
+    this.timerFinish = setTimeout(() => {
+      this.getUIContext().animateTo({ duration: 500, curve: Curve.EaseOut }, () => {
+        this.homeReady = true;
+      });
+      this.splashVisible = false;
+    }, 2350);
+  }
+
+  private skipSplash(): void {
+    if (this.timerProgress1 !== -1) {
+      clearTimeout(this.timerProgress1);
+    }
+    if (this.timerProgress2 !== -1) {
+      clearTimeout(this.timerProgress2);
+    }
+    if (this.timerProgress3 !== -1) {
+      clearTimeout(this.timerProgress3);
+    }
+    if (this.timerExit !== -1) {
+      clearTimeout(this.timerExit);
+    }
+    if (this.timerFinish !== -1) {
+      clearTimeout(this.timerFinish);
+    }
+    this.homeReady = true;
+    this.splashVisible = false;
   }
 
   build() {
     Stack() {
-      /* 【不可改】Navigation 容器、4 个按钮的 onClick pushPath 与路由名逐字保留 */
-      Navigation(this.pageStack) {
-        Scroll() {
-          Column() {
-            // ========================
-            // 顶部品牌与安全状态头部
-            // ========================
+      Column() {
+        Navigation(this.pageStack) {
+          Scroll() {
             Column() {
+              // ========================
+              // 顶部品牌与安全状态
+              // ========================
               Row() {
-                Column() {
-                  Text('鸿蒙智安')
-                    .fontSize(30)
+                Row() {
+                  Text('◆')
+                    .fontSize(20)
+                    .fontColor(Color.White)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#0F172A')
-                    .margin({ bottom: 4 })
+                }
+                .width(42)
+                .height(42)
+                .borderRadius(14)
+                .linearGradient({
+                  angle: 135,
+                  colors: [['#2563EB', 0.0], ['#6366F1', 1.0]]
+                })
+                .justifyContent(FlexAlign.Center)
+                .shadow({ radius: 12, color: 'rgba(37,99,235,0.3)', offsetY: 4 })
 
-                  Text('校园安全协同应用')
-                    .fontSize(14)
+                Column() {
+                  Row() {
+                    Text('鸿蒙智安')
+                      .fontSize(20)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor('#0F172A')
+
+                    Text('NEXT')
+                      .fontSize(9)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor('#2563EB')
+                      .backgroundColor('#DBEAFE')
+                      .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                      .borderRadius(6)
+                      .margin({ left: 6 })
+                  }
+
+                  Text('智慧校园 · 安全协同平台')
+                    .fontSize(11)
                     .fontColor('#64748B')
-                    .fontWeight(FontWeight.Medium)
+                    .margin({ top: 2 })
                 }
                 .alignItems(HorizontalAlign.Start)
+                .margin({ left: 10 })
 
                 Blank()
 
-                // 状态指示徽章
-                Row({ space: 6 }) {
+                Row({ space: 5 }) {
                   Row()
-                    .width(8)
-                    .height(8)
+                    .width(7)
+                    .height(7)
                     .borderRadius(4)
                     .backgroundColor('#10B981')
-
-                  Text('实时监控中')
-                    .fontSize(12)
-                    .fontColor('#047857')
+                  Text('守护中')
+                    .fontSize(11)
                     .fontWeight(FontWeight.Medium)
+                    .fontColor('#047857')
                 }
                 .padding({ left: 10, right: 10, top: 6, bottom: 6 })
                 .borderRadius(16)
@@ -115,397 +356,472 @@ struct Index {
                 .border({ width: 1, color: '#A7F3D0' })
               }
               .width('100%')
-              .alignItems(VerticalAlign.Center)
-              .margin({ bottom: 20 })
+              .padding({ left: 16, right: 16, top: 16, bottom: 12 })
 
-              // 校园安全公告卡片
-              Row() {
-                Column() {
-                  Text('平安校园 · 敏捷响应')
-                    .fontSize(16)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#FFFFFF')
-                    .margin({ bottom: 4 })
+              // ========================
+              // 智慧安防总览卡片
+              // ========================
+              Column() {
+                Row() {
+                  Text('综合安全指数 99.4')
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(Color.White)
+                    .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+                    .borderRadius(12)
+                    .backgroundColor('rgba(255,255,255,0.18)')
+                    .border({ width: 1, color: 'rgba(255,255,255,0.25)' })
 
-                  Text('隐患秒级上报 · 任务闭环处置 · 数据实时洞察')
-                    .fontSize(12)
-                    .fontColor('rgba(255, 255, 255, 0.85)')
+                  Blank()
+
+                  Text('今日实时播报')
+                    .fontSize(11)
+                    .fontColor('rgba(255,255,255,0.75)')
                 }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
+                .width('100%')
+                .margin({ bottom: 12 })
 
-                Text('SHIELD')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bolder)
-                  .fontColor('rgba(255, 255, 255, 0.3)')
+                Row() {
+                  Column() {
+                    Text(this.events.length.toString())
+                      .fontSize(20)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Color.White)
+                    Text('安全事件')
+                      .fontSize(10)
+                      .fontColor('rgba(255,255,255,0.75)')
+                      .margin({ top: 2 })
+                  }
+                  .layoutWeight(1)
+
+                  Column() {
+                    Text(this.getUrgentCount().toString())
+                      .fontSize(20)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor('#FCD34D')
+                    Text('高危预警')
+                      .fontSize(10)
+                      .fontColor('rgba(255,255,255,0.75)')
+                      .margin({ top: 2 })
+                  }
+                  .layoutWeight(1)
+                  .border({
+                    width: { left: 1, right: 1 },
+                    color: 'rgba(255,255,255,0.15)'
+                  })
+
+                  Column() {
+                    Text(this.getPendingTaskCount().toString())
+                      .fontSize(20)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor('#6EE7B7')
+                    Text('在办任务')
+                      .fontSize(10)
+                      .fontColor('rgba(255,255,255,0.75)')
+                      .margin({ top: 2 })
+                  }
+                  .layoutWeight(1)
+                }
+                .width('100%')
+                .padding({ top: 10, bottom: 10 })
+
+                Text('全校 428 个安防巡检网格运行正常')
+                  .fontSize(11)
+                  .fontColor('rgba(255,255,255,0.8)')
+                  .width('100%')
+                  .margin({ top: 8 })
               }
               .width('100%')
-              .padding(18)
-              .borderRadius(16)
+              .padding(16)
+              .borderRadius(20)
               .linearGradient({
                 angle: 135,
-                colors: [['#1B6EFF', 0.0], ['#0A4DC2', 1.0]]
+                colors: [['#2563EB', 0.0], ['#1E40AF', 0.6], ['#312E81', 1.0]]
               })
-              .shadow({
-                radius: 16,
-                color: 'rgba(27, 110, 255, 0.25)',
-                offsetY: 6
-              })
+              .shadow({ radius: 18, color: 'rgba(37,99,235,0.28)', offsetY: 8 })
+              .opacity(this.homeReady ? 1 : 0)
+              .translate({ y: this.homeReady ? 0 : 16 })
+              .animation({ duration: 420, curve: Curve.EaseOut, delay: 80 })
+              .margin({ left: 16, right: 16 })
+
+              // ========================
+              // 24H 保卫处一键求助
+              // ========================
+              Row() {
+                Row({ space: 6 }) {
+                  Row()
+                    .width(7)
+                    .height(7)
+                    .borderRadius(4)
+                    .backgroundColor('#EF4444')
+                  Text('24H 校园保卫处总机')
+                    .fontSize(12)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#1E293B')
+                }
+
+                Blank()
+
+                Text('一键求助')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#DC2626')
+                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                  .borderRadius(14)
+                  .backgroundColor('#FEF2F2')
+                  .onClick(() => {
+                    promptAction.showToast({ message: '已模拟拨通保卫处应急调度室' });
+                  })
+              }
+              .width('100%')
+              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+              .borderRadius(16)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E2E8F0' })
+              .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+              .opacity(this.homeReady ? 1 : 0)
+              .translate({ y: this.homeReady ? 0 : 16 })
+              .animation({ duration: 420, curve: Curve.EaseOut, delay: 160 })
+              .margin({ left: 16, right: 16, top: 12 })
+
+              // ========================
+              // 业务协同 Bento 网格
+              // ========================
+              Row() {
+                Text('业务协同与处置中心')
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#64748B')
+                Blank()
+                Text('协同闭环率 100%')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#2563EB')
+              }
+              .width('100%')
+              .padding({ left: 18, right: 18, top: 18, bottom: 8 })
+
+              Row() {
+                Column({ space: 10 }) {
+                  this.bentoCard(
+                    '安全事件',
+                    '核查、确权与指派',
+                    this.events.length.toString() + ' 件',
+                    '#2563EB',
+                    '#EFF6FF',
+                    '#2563EB',
+                    '△',
+                    'EventPage'
+                  )
+                  this.bentoCard(
+                    '隐患上报',
+                    '随手拍与一键提交',
+                    '秒级直达',
+                    '#059669',
+                    '#ECFDF5',
+                    '#059669',
+                    '□',
+                    'ReportPage'
+                  )
+                }
+                .layoutWeight(1)
+
+                Column({ space: 10 }) {
+                  this.bentoCard(
+                    '处置任务',
+                    '巡检维保现场接单',
+                    this.getPendingTaskCount().toString() + ' 待办',
+                    '#D97706',
+                    '#FFF7ED',
+                    '#D97706',
+                    '▲',
+                    'TaskPage'
+                  )
+                  this.bentoCard(
+                    '数据统计',
+                    '安全全景量化分析',
+                    '态势洞察',
+                    '#7C3AED',
+                    '#FAF5FF',
+                    '#7C3AED',
+                    '◇',
+                    'StatisticsPage'
+                  )
+                }
+                .layoutWeight(1)
+              }
+              .width('100%')
+              .padding({ left: 16, right: 16 })
+              .opacity(this.homeReady ? 1 : 0)
+              .translate({ y: this.homeReady ? 0 : 20 })
+              .animation({ duration: 460, curve: Curve.EaseOut, delay: 240 })
+
+              // ========================
+              // 最新流转事件
+              // ========================
+              Row() {
+                Text('最新流转事件')
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#334155')
+                Blank()
+                Text('查看全部 ›')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#2563EB')
+                  .onClick(() => {
+                    this.navigateTo('EventPage');
+                  })
+              }
+              .width('100%')
+              .padding({ left: 18, right: 18, top: 18, bottom: 8 })
+
+              Column({ space: 10 }) {
+                ForEach(this.events.slice(0, 2), (event: SecurityEvent) => {
+                  Row() {
+                    Row()
+                      .width(8)
+                      .height(8)
+                      .borderRadius(4)
+                      .backgroundColor('#2563EB')
+
+                    Column() {
+                      Text(event.title)
+                        .fontSize(13)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor('#334155')
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      Text(event.location)
+                        .fontSize(11)
+                        .fontColor('#94A3B8')
+                        .margin({ top: 3 })
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }
+                    .alignItems(HorizontalAlign.Start)
+                    .layoutWeight(1)
+                    .margin({ left: 10 })
+
+                    Text(event.status)
+                      .fontSize(10)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.getStatusColor(event.status))
+                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                      .borderRadius(8)
+                      .backgroundColor('#F8FAFC')
+                  }
+                  .width('100%')
+                  .padding(12)
+                  .borderRadius(16)
+                  .backgroundColor(Color.White)
+                  .border({ width: 1, color: '#E2E8F0' })
+                  .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+                  .onClick(() => {
+                    EventService.setSelectedEventId(event.id);
+                    this.currentTab = 'EventPage';
+                    this.pageStack.pushPath({ name: 'EventDetailPage' });
+                  })
+                }, (event: SecurityEvent) => event.id)
+              }
+              .width('100%')
+              .padding({ left: 16, right: 16, bottom: 20 })
+              .opacity(this.homeReady ? 1 : 0)
+              .translate({ y: this.homeReady ? 0 : 20 })
+              .animation({ duration: 460, curve: Curve.EaseOut, delay: 320 })
             }
             .width('100%')
-            .padding({ left: 20, right: 20, top: 20, bottom: 12 })
-
-            // ========================
-            // 核心业务功能入口 (四宫格/卡片阵列)
-            // ========================
-            Text('核心业务协同')
-              .fontSize(17)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#334155')
-              .width('100%')
-              .padding({ left: 20, right: 20, top: 12, bottom: 12 })
-
-            Column({ space: 14 }) {
-              // 1. 安全事件入口
-              Button({ type: ButtonType.Normal }) {
-                Row() {
-                  // 左侧图标装饰块
-                  Row() {
-                    Text('◆')
-                      .fontSize(20)
-                      .fontColor('#1B6EFF')
-                      .fontWeight(FontWeight.Bold)
-                  }
-                  .width(48)
-                  .height(48)
-                  .borderRadius(14)
-                  .backgroundColor('#EFF6FF')
-                  .justifyContent(FlexAlign.Center)
-                  .margin({ right: 14 })
-
-                  Column() {
-                    Row() {
-                      Text('安全事件')
-                        .fontSize(17)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#0F172A')
-
-                      Blank()
-
-                      Text('事件核查与处置')
-                        .fontSize(12)
-                        .fontColor('#64748B')
-                    }
-                    .width('100%')
-                    .margin({ bottom: 4 })
-
-                    Text('全校安全隐患汇聚列表，支持审核与任务指派')
-                      .fontSize(13)
-                      .fontColor('#94A3B8')
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-
-                  Text('›')
-                    .fontSize(24)
-                    .fontColor('#CBD5E1')
-                    .margin({ left: 8 })
-                }
-                .width('100%')
-                .padding(16)
-              }
-              .width('100%')
-              .borderRadius(16)
-              .backgroundColor('#FFFFFF')
-              .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.05)', offsetY: 4 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 24 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 120 })
-              .onClick(() => {
-                this.pageStack.pushPath({ name: 'EventPage' })
-              })
-
-              // 2. 处置任务入口
-              Button({ type: ButtonType.Normal }) {
-                Row() {
-                  Row() {
-                    Text('▲')
-                      .fontSize(20)
-                      .fontColor('#EA580C')
-                      .fontWeight(FontWeight.Bold)
-                  }
-                  .width(48)
-                  .height(48)
-                  .borderRadius(14)
-                  .backgroundColor('#FFF7ED')
-                  .justifyContent(FlexAlign.Center)
-                  .margin({ right: 14 })
-
-                  Column() {
-                    Row() {
-                      Text('处置任务')
-                        .fontSize(17)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#0F172A')
-
-                      Blank()
-
-                      Text('闭环跟踪')
-                        .fontSize(12)
-                        .fontColor('#EA580C')
-                    }
-                    .width('100%')
-                    .margin({ bottom: 4 })
-
-                    Text('巡检与维修人员处理工单，反馈处置结果')
-                      .fontSize(13)
-                      .fontColor('#94A3B8')
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-
-                  Text('›')
-                    .fontSize(24)
-                    .fontColor('#CBD5E1')
-                    .margin({ left: 8 })
-                }
-                .width('100%')
-                .padding(16)
-              }
-              .width('100%')
-              .borderRadius(16)
-              .backgroundColor('#FFFFFF')
-              .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.05)', offsetY: 4 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 24 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 210 })
-              .onClick(() => {
-                this.pageStack.pushPath({ name: 'TaskPage' })
-              })
-
-              // 3. 隐患上报入口
-              Button({ type: ButtonType.Normal }) {
-                Row() {
-                  Row() {
-                    Text('■')
-                      .fontSize(20)
-                      .fontColor('#16A34A')
-                      .fontWeight(FontWeight.Bold)
-                  }
-                  .width(48)
-                  .height(48)
-                  .borderRadius(14)
-                  .backgroundColor('#F0FDF4')
-                  .justifyContent(FlexAlign.Center)
-                  .margin({ right: 14 })
-
-                  Column() {
-                    Row() {
-                      Text('隐患上报')
-                        .fontSize(17)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#0F172A')
-
-                      Blank()
-
-                      Text('师生直通车')
-                        .fontSize(12)
-                        .fontColor('#16A34A')
-                    }
-                    .width('100%')
-                    .margin({ bottom: 4 })
-
-                    Text('发现消防、用电、设施异常，一键快速填报')
-                      .fontSize(13)
-                      .fontColor('#94A3B8')
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-
-                  Text('›')
-                    .fontSize(24)
-                    .fontColor('#CBD5E1')
-                    .margin({ left: 8 })
-                }
-                .width('100%')
-                .padding(16)
-              }
-              .width('100%')
-              .borderRadius(16)
-              .backgroundColor('#FFFFFF')
-              .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.05)', offsetY: 4 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 24 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 300 })
-              .onClick(() => {
-                this.pageStack.pushPath({ name: 'ReportPage' })
-              })
-
-              // 4. 数据统计入口
-              Button({ type: ButtonType.Normal }) {
-                Row() {
-                  Row() {
-                    Text('◈')
-                      .fontSize(20)
-                      .fontColor('#9333EA')
-                      .fontWeight(FontWeight.Bold)
-                  }
-                  .width(48)
-                  .height(48)
-                  .borderRadius(14)
-                  .backgroundColor('#FAF5FF')
-                  .justifyContent(FlexAlign.Center)
-                  .margin({ right: 14 })
-
-                  Column() {
-                    Row() {
-                      Text('数据统计')
-                        .fontSize(17)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#0F172A')
-
-                      Blank()
-
-                      Text('态势总览')
-                        .fontSize(12)
-                        .fontColor('#9333EA')
-                    }
-                    .width('100%')
-                    .margin({ bottom: 4 })
-
-                    Text('校园安全运行态势量化分析与数据指标')
-                      .fontSize(13)
-                      .fontColor('#94A3B8')
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-
-                  Text('›')
-                    .fontSize(24)
-                    .fontColor('#CBD5E1')
-                    .margin({ left: 8 })
-                }
-                .width('100%')
-                .padding(16)
-              }
-              .width('100%')
-              .borderRadius(16)
-              .backgroundColor('#FFFFFF')
-              .shadow({ radius: 12, color: 'rgba(15, 23, 42, 0.05)', offsetY: 4 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 24 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 390 })
-              .onClick(() => {
-                this.pageStack.pushPath({ name: 'StatisticsPage' })
-              })
-            }
-            .width('100%')
-            .padding({ left: 20, right: 20, bottom: 28 })
           }
           .width('100%')
+          .height('100%')
+          .backgroundColor('#F8FAFC')
         }
         .width('100%')
-        .height('100%')
-        .backgroundColor('#F8FAFC')
+        .layoutWeight(1)
+        .navDestination(this.pageMap)
+
+        // ========================
+        // 底部 TabBar
+        // ========================
+        Row() {
+          this.tabItem('Index', '首页', '●')
+          this.tabItem('EventPage', '事件', '△')
+
+          Column() {
+            Row() {
+              Text('+')
+                .fontSize(22)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+            }
+            .width(46)
+            .height(46)
+            .borderRadius(23)
+            .linearGradient({
+              angle: 135,
+              colors: [['#2563EB', 0.0], ['#6366F1', 1.0]]
+            })
+            .justifyContent(FlexAlign.Center)
+            .shadow({ radius: 12, color: 'rgba(37,99,235,0.35)', offsetY: 4 })
+
+            Text('上报')
+              .fontSize(10)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#2563EB')
+              .margin({ top: 2 })
+          }
+          .width(56)
+          .justifyContent(FlexAlign.Center)
+          .onClick(() => {
+            this.navigateTo('ReportPage');
+          })
+
+          this.tabItem('TaskPage', '任务', '✓')
+          this.tabItem('StatisticsPage', '统计', '◇')
+        }
+        .width('100%')
+        .height(62)
+        .backgroundColor(Color.White)
+        .border({ width: 1, color: '#E2E8F0' })
       }
-      .navDestination(this.pageMap)
+      .width('100%')
+      .height('100%')
 
       // ========================
-      // 启动开屏动画覆盖层（方案 A，无缝淡出并彻底销毁）
+      // 启动开屏动画
       // ========================
       if (this.splashVisible) {
         Column() {
-          // 品牌 Logo 徽章
+          // 跳过按钮
           Row() {
-            Text('◆')
-              .fontSize(42)
-              .fontColor('#FFFFFF')
-              .fontWeight(FontWeight.Bold)
+            Blank()
+            Text('跳过 ›')
+              .fontSize(11)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('rgba(255,255,255,0.8)')
+              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+              .borderRadius(14)
+              .backgroundColor('rgba(255,255,255,0.1)')
+              .border({ width: 1, color: 'rgba(255,255,255,0.15)' })
+              .onClick(() => {
+                this.skipSplash();
+              })
           }
-          .width(96)
-          .height(96)
-          .borderRadius(28)
-          .linearGradient({
-            angle: 135,
-            colors: [['#1B6EFF', 0.0], ['#00C2FF', 1.0]]
-          })
-          .justifyContent(FlexAlign.Center)
-          .shadow({
-            radius: 28,
-            color: 'rgba(27, 110, 255, 0.35)',
-            offsetY: 10
-          })
-          .scale({ x: this.splashScale, y: this.splashScale })
+          .width('100%')
+          .padding({ top: 56, right: 20 })
 
-          Text('鸿蒙智安')
-            .fontSize(32)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#0F172A')
-            .margin({ top: 24 })
+          // 品牌徽章 + 雷达光环
+          Stack({ alignContent: Alignment.Center }) {
+            Column()
+              .width(128)
+              .height(128)
+              .borderRadius(64)
+              .border({ width: 1, color: 'rgba(96,165,250,0.4)' })
+              .scale({ x: this.splashScale, y: this.splashScale })
+
+            Column()
+              .width(104)
+              .height(104)
+              .borderRadius(52)
+              .border({ width: 1, color: 'rgba(129,140,248,0.3)' })
+              .scale({ x: this.splashScale, y: this.splashScale })
+
+            Row() {
+              Text('◆')
+                .fontSize(40)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+            }
+            .width(92)
+            .height(92)
+            .borderRadius(28)
+            .linearGradient({
+              angle: 135,
+              colors: [['#3B82F6', 0.0], ['#6366F1', 1.0]]
+            })
+            .justifyContent(FlexAlign.Center)
+            .shadow({ radius: 24, color: 'rgba(59,130,246,0.45)', offsetY: 10 })
+            .scale({ x: this.splashScale, y: this.splashScale })
+            .opacity(this.splashOpacity)
+          }
+          .width(140)
+          .height(140)
+
+          // 品牌名称
+          Row() {
+            Text('鸿蒙智安')
+              .fontSize(28)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.White)
+            Text('NEXT')
+              .fontSize(9)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.White)
+              .backgroundColor('rgba(255,255,255,0.18)')
+              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .borderRadius(6)
+              .margin({ left: 8 })
+          }
+          .margin({ top: 24 })
+          .opacity(this.splashOpacity)
+          .translate({ y: this.splashOffsetY })
+
+          Text('智慧校园 · 安全敏捷协同平台')
+            .fontSize(12)
+            .fontColor('rgba(255,255,255,0.65)')
+            .margin({ top: 8, bottom: 28 })
             .opacity(this.splashOpacity)
             .translate({ y: this.splashOffsetY })
 
-          Text('校园安全协同应用')
-            .fontSize(15)
-            .fontColor('#64748B')
-            .fontWeight(FontWeight.Medium)
-            .margin({ top: 8, bottom: 40 })
-            .opacity(this.splashOpacity)
+          // 进度条与状态文案
+          Column() {
+            Row() {
+              Row()
+                .width(this.splashProgress * 1.8)
+                .height(5)
+                .borderRadius(3)
+                .linearGradient({
+                  angle: 90,
+                  colors: [['#60A5FA', 0.0], ['#818CF8', 1.0]]
+                })
+            }
+            .width(180)
+            .height(5)
+            .borderRadius(3)
+            .backgroundColor('rgba(255,255,255,0.12)')
 
-          // 优雅加载条（宽度随 splashProgress 生长）
-          Row() {
-            Row()
-              .width(this.splashProgress)
-              .height(4)
-              .borderRadius(2)
-              .backgroundColor('#1B6EFF')
+            Row() {
+              Text(this.splashStepText)
+                .fontSize(10)
+                .fontColor('rgba(255,255,255,0.55)')
+                .layoutWeight(1)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(this.splashProgress.toString() + '%')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#93C5FD')
+            }
+            .width(180)
+            .margin({ top: 8 })
           }
-          .width(80)
-          .height(4)
-          .borderRadius(2)
-          .backgroundColor('#E2E8F0')
           .opacity(this.splashOpacity)
+
+          // 底部认证
+          Text('HarmonyOS NEXT 驱动 · 敏捷响应 闭环协同')
+            .fontSize(10)
+            .fontColor('rgba(255,255,255,0.35)')
+            .margin({ top: 90 })
         }
         .width('100%')
         .height('100%')
-        .backgroundColor('#FFFFFF')
+        .linearGradient({
+          angle: 180,
+          colors: [['#020617', 0.0], ['#0F172A', 0.55], ['#1E1B4B', 1.0]]
+        })
         .justifyContent(FlexAlign.Center)
         .onAppear(() => {
-          // 入场动效
-          this.getUIContext().animateTo({ duration: 550, curve: Curve.EaseOut }, () => {
-            this.splashOpacity = 1;
-            this.splashScale = 1;
-            this.splashOffsetY = 0;
-          });
-
-          // 加载条生长动效
-          this.getUIContext().animateTo({ duration: 1100, curve: Curve.EaseOut }, () => {
-            this.splashProgress = 80;
-          });
-
-          // 停留后平滑淡出
-          this.timerExit = setTimeout(() => {
-            this.getUIContext().animateTo({ duration: 450, curve: Curve.EaseIn }, () => {
-              this.splashOpacity = 0;
-              this.splashScale = 0.92;
-            });
-          }, 1200);
-
-          // 彻底销毁移除，不留返回栈，并触发首页卡片入场
-          this.timerFinish = setTimeout(() => {
-            this.getUIContext().animateTo({ duration: 500, curve: Curve.EaseOut }, () => {
-              this.homeReady = true;
-            });
-            this.splashVisible = false;
-          }, 1700);
+          this.startSplash();
         })
       }
     }

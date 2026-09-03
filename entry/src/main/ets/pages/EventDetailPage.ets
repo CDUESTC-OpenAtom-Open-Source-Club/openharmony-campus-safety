@@ -4,43 +4,352 @@ import {
   EventStatus,
   EventPriority
 } from '../model/SecurityEvent';
-
 import { EventService } from '../service/EventService';
 
 @Component
 export struct EventDetailPage {
-  /* 【不可改】@State 与取值方式逐字保留 */
+  pageStack: NavPathStack = new NavPathStack();
+
   @State private eventId: string = EventService.getSelectedEventId();
   @State private isConfirmed: boolean = false;
   @State private taskGenerated: boolean = false;
 
+  @Builder
+  flowNode(
+    index: number,
+    label: string,
+    done: boolean,
+    active: boolean
+  ) {
+    Column() {
+      Text(done ? '✓' : index.toString())
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(done ? Color.White : active ? Color.White : '#64748B')
+    }
+    .width(24)
+    .height(24)
+    .borderRadius(12)
+    .backgroundColor(done ? '#10B981' : active ? '#2563EB' : '#E2E8F0')
+    .justifyContent(FlexAlign.Center)
+
+    Text(label)
+      .fontSize(9)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(done || active ? '#2563EB' : '#94A3B8')
+      .margin({ top: 5 })
+  }
+
   build() {
     Column() {
-      if (this.eventId !== '') {
-        Scroll() {
-          this.buildEventDetail()
-        }
-        .width('100%')
-        .height('100%')
-      } else {
-        Column({ space: 12 }) {
-          Text('●')
-            .fontSize(36)
-            .fontColor('#94A3B8')
-            .margin({ bottom: 6 })
+      // 顶部标题栏
+      Row() {
+        Text('‹')
+          .fontSize(30)
+          .fontColor('#334155')
+          .padding({ left: 4, right: 10 })
+          .onClick(() => {
+            this.pageStack.pop();
+          })
 
-          Text('未找到事件')
-            .fontSize(20)
+        Column() {
+          Text('事件详情')
+            .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor('#0F172A')
 
+          Text('单号：' + this.eventId)
+            .fontSize(10)
+            .fontColor('#94A3B8')
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 16, top: 14, bottom: 10 })
+      .backgroundColor(Color.White)
+
+      if (this.eventId === '') {
+        Column({ space: 10 }) {
+          Text('●')
+            .fontSize(32)
+            .fontColor('#CBD5E1')
+          Text('未找到安全事件')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#475569')
           Text('该事件不存在或已从系统中归档')
-            .fontSize(14)
-            .fontColor('#64748B')
+            .fontSize(12)
+            .fontColor('#94A3B8')
         }
         .width('100%')
-        .height('100%')
+        .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
+      } else {
+        Scroll() {
+          Column({ space: 12 }) {
+            // 全流程 5 节点流转轴
+            Column() {
+              Row() {
+                Text('事件全流程流转进度')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#334155')
+                Blank()
+                Text(
+                  this.taskGenerated
+                    ? '第 3 阶段 · 现场处置'
+                    : this.isConfirmed
+                    ? '第 2 阶段 · 已确认'
+                    : '第 1 阶段 · 待核查'
+                )
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#2563EB')
+              }
+              .width('100%')
+              .margin({ bottom: 14 })
+
+              Row() {
+                this.flowNode(1, '上报', true, true)
+
+                Row()
+                  .height(2)
+                  .layoutWeight(1)
+                  .backgroundColor(this.isConfirmed || this.taskGenerated ? '#2563EB' : '#E2E8F0')
+                  .margin({ bottom: 18 })
+
+                this.flowNode(2, '确认', this.isConfirmed, this.isConfirmed)
+
+                Row()
+                  .height(2)
+                  .layoutWeight(1)
+                  .backgroundColor(this.taskGenerated ? '#2563EB' : '#E2E8F0')
+                  .margin({ bottom: 18 })
+
+                this.flowNode(3, '指派', this.taskGenerated, this.taskGenerated)
+
+                Row()
+                  .height(2)
+                  .layoutWeight(1)
+                  .backgroundColor(this.getEvent().status === EventStatus.COMPLETED ? '#10B981' : '#E2E8F0')
+                  .margin({ bottom: 18 })
+
+                this.flowNode(4, '处置', false, this.getEvent().status === EventStatus.COMPLETED)
+
+                Row()
+                  .height(2)
+                  .layoutWeight(1)
+                  .backgroundColor(this.getEvent().status === EventStatus.COMPLETED ? '#10B981' : '#E2E8F0')
+                  .margin({ bottom: 18 })
+
+                this.flowNode(5, '闭环', false, this.getEvent().status === EventStatus.COMPLETED)
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Bottom)
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(18)
+            .backgroundColor(Color.White)
+            .border({ width: 1, color: '#E2E8F0' })
+            .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+
+            // 头部详情卡片
+            Column() {
+              Row() {
+                Text(this.getEvent().type)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+                  .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                  .borderRadius(10)
+                  .backgroundColor('rgba(255,255,255,0.18)')
+
+                Blank()
+
+                Text('优先级：' + this.getEvent().priority)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#FCD34D')
+                  .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                  .borderRadius(10)
+                  .backgroundColor('rgba(245,158,11,0.18)')
+                  .border({ width: 1, color: 'rgba(245,158,11,0.35)' })
+              }
+              .width('100%')
+              .margin({ bottom: 10 })
+
+              Text(this.getEvent().title)
+                .fontSize(20)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+                .width('100%')
+
+              Text(this.getEvent().location)
+                .fontSize(11)
+                .fontColor('rgba(255,255,255,0.7)')
+                .margin({ top: 6 })
+            }
+            .width('100%')
+            .padding(16)
+            .borderRadius(20)
+            .linearGradient({
+              angle: 135,
+              colors: [['#0F172A', 0.0], ['#312E81', 1.0]]
+            })
+            .shadow({ radius: 16, color: 'rgba(15,23,42,0.25)', offsetY: 6 })
+
+            // 核心信息卡片
+            Column({ space: 10 }) {
+              Text('工单核心信息')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#94A3B8')
+                .width('100%')
+
+              Row() {
+                Text('上报人员')
+                  .fontSize(12)
+                  .fontColor('#64748B')
+                  .layoutWeight(1)
+                Text(this.getEvent().reporter)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#0F172A')
+              }
+              .width('100%')
+
+              Row() {
+                Text('上报时间')
+                  .fontSize(12)
+                  .fontColor('#64748B')
+                  .layoutWeight(1)
+                Text(this.getEvent().reportTime)
+                  .fontSize(12)
+                  .fontColor('#475569')
+              }
+              .width('100%')
+
+              Row() {
+                Text('当前流转状态')
+                  .fontSize(12)
+                  .fontColor('#64748B')
+                  .layoutWeight(1)
+                Text(this.isConfirmed ? EventStatus.CONFIRMED : this.getEvent().status)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#2563EB')
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(18)
+            .backgroundColor(Color.White)
+            .border({ width: 1, color: '#E2E8F0' })
+            .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
+
+            // 现场情况描述
+            Column() {
+              Text('现场情况描述')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#94A3B8')
+                .width('100%')
+                .margin({ bottom: 8 })
+
+              Text(this.getEvent().description)
+                .fontSize(12)
+                .fontColor('#334155')
+                .lineHeight(20)
+                .width('100%')
+                .padding(12)
+                .borderRadius(14)
+                .backgroundColor('#F8FAFC')
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(18)
+            .backgroundColor(Color.White)
+            .border({ width: 1, color: '#E2E8F0' })
+
+            // 操作按钮
+            if (
+              this.getEvent().status === EventStatus.PENDING &&
+              !this.isConfirmed
+            ) {
+              Button('确认事件属实')
+                .width('100%')
+                .height(46)
+                .borderRadius(14)
+                .backgroundColor('#2563EB')
+                .fontColor(Color.White)
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .shadow({ radius: 10, color: 'rgba(37,99,235,0.25)', offsetY: 4 })
+                .onClick(() => {
+                  EventService.confirmEvent(this.eventId);
+                  this.isConfirmed = true;
+                })
+            }
+
+            if (
+              (this.getEvent().status === EventStatus.CONFIRMED ||
+                this.isConfirmed) &&
+              !this.taskGenerated
+            ) {
+              Button('下发并生成现场处置任务')
+                .width('100%')
+                .height(46)
+                .borderRadius(14)
+                .backgroundColor('#0EA5E9')
+                .fontColor(Color.White)
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .shadow({ radius: 10, color: 'rgba(14,165,233,0.25)', offsetY: 4 })
+                .margin({ top: 10 })
+                .onClick(() => {
+                  EventService.createTaskFromEvent(this.eventId);
+                  this.taskGenerated = true;
+                })
+            }
+
+            if (this.taskGenerated) {
+              Column({ space: 10 }) {
+                Text('✓ 处置工单已下发，维保团队已接入')
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#059669')
+                  .width('100%')
+                  .textAlign(TextAlign.Center)
+
+                Button('前往处置任务中心')
+                  .width('100%')
+                  .height(42)
+                  .borderRadius(12)
+                  .backgroundColor('#059669')
+                  .fontColor(Color.White)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .onClick(() => {
+                    this.pageStack.pushPath({ name: 'TaskPage' });
+                  })
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(16)
+              .backgroundColor('#ECFDF5')
+              .border({ width: 1, color: '#A7F3D0' })
+              .margin({ top: 10 })
+            }
+          }
+          .width('100%')
+          .padding({ left: 14, right: 14, top: 12, bottom: 24 })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Off)
       }
     }
     .width('100%')
@@ -48,228 +357,6 @@ export struct EventDetailPage {
     .backgroundColor('#F8FAFC')
   }
 
-  /* 【不可改】@Builder 方法与 getEvent() 方法名、逻辑、返回值逐字保留；仅可美化其内部排版 */
-  @Builder
-  buildEventDetail() {
-    Column() {
-      // 头部主卡片
-      Column() {
-        Row() {
-          Row() {
-            Text('事件详情')
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#FFFFFF')
-          }
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .borderRadius(6)
-          .backgroundColor('rgba(255, 255, 255, 0.25)')
-
-          Blank()
-
-          Row() {
-            Text('优先级: ' + this.getEvent().priority)
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#FFFFFF')
-          }
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .borderRadius(6)
-          .backgroundColor('rgba(0, 0, 0, 0.2)')
-        }
-        .width('100%')
-        .margin({ bottom: 12 })
-
-        Text(this.getEvent().title)
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-          .width('100%')
-          .margin({ bottom: 8 })
-
-        Text('编号：' + this.getEvent().id)
-          .fontSize(13)
-          .fontColor('rgba(255, 255, 255, 0.8)')
-          .width('100%')
-      }
-      .width('100%')
-      .padding(20)
-      .borderRadius(18)
-      .linearGradient({
-        angle: 135,
-        colors: [['#1B6EFF', 0.0], ['#0F4CA6', 1.0]]
-      })
-      .shadow({ radius: 14, color: 'rgba(27, 110, 255, 0.25)', offsetY: 6 })
-      .margin({ bottom: 16 })
-
-      // 核心属性矩阵卡片
-      Column({ space: 10 }) {
-        Text('核心属性')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#334155')
-          .width('100%')
-          .margin({ bottom: 4 })
-
-        Row() {
-          Text('事件类型')
-            .fontSize(14)
-            .fontColor('#64748B')
-            .width(80)
-
-          Text(this.getEvent().type)
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#0F172A')
-            .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          Text('发生地点')
-            .fontSize(14)
-            .fontColor('#64748B')
-            .width(80)
-
-          Text(this.getEvent().location)
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#0F172A')
-            .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          Text('当前状态')
-            .fontSize(14)
-            .fontColor('#64748B')
-            .width(80)
-
-          Text(
-            this.isConfirmed
-              ? EventStatus.CONFIRMED
-              : this.getEvent().status
-          )
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isConfirmed || this.getEvent().status === EventStatus.CONFIRMED ? '#1B6EFF' : '#EA580C')
-            .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          Text('上报人')
-            .fontSize(14)
-            .fontColor('#64748B')
-            .width(80)
-
-          Text(this.getEvent().reporter)
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#0F172A')
-            .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          Text('上报时间')
-            .fontSize(14)
-            .fontColor('#64748B')
-            .width(80)
-
-          Text(this.getEvent().reportTime)
-            .fontSize(14)
-            .fontColor('#475569')
-            .layoutWeight(1)
-        }
-        .width('100%')
-      }
-      .width('100%')
-      .padding(18)
-      .borderRadius(16)
-      .backgroundColor('#FFFFFF')
-      .shadow({ radius: 10, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
-      .margin({ bottom: 16 })
-
-      // 事件描述详情卡片
-      Column() {
-        Text('事件描述')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#334155')
-          .width('100%')
-          .margin({ bottom: 10 })
-
-        Text(this.getEvent().description)
-          .fontSize(14)
-          .fontColor('#1E293B')
-          .lineHeight(22)
-          .width('100%')
-      }
-      .width('100%')
-      .padding(18)
-      .borderRadius(16)
-      .backgroundColor('#FFFFFF')
-      .shadow({ radius: 10, color: 'rgba(15, 23, 42, 0.04)', offsetY: 2 })
-      .margin({ bottom: 24 })
-
-      // 操作协同按钮组
-      if (
-        this.getEvent().status === EventStatus.PENDING &&
-          !this.isConfirmed
-      ) {
-        Button('确认事件')
-          .width('100%')
-          .height(48)
-          .borderRadius(12)
-          .backgroundColor('#1B6EFF')
-          .fontWeight(FontWeight.Medium)
-          .shadow({ radius: 10, color: 'rgba(27, 110, 255, 0.25)', offsetY: 4 })
-          .onClick(() => {
-            EventService.confirmEvent(this.eventId);
-            this.isConfirmed = true;
-          })
-      }
-
-      if (
-        (this.getEvent().status === EventStatus.CONFIRMED ||
-        this.isConfirmed) &&
-          !this.taskGenerated
-      ) {
-        Button('生成处置任务')
-          .width('100%')
-          .height(48)
-          .borderRadius(12)
-          .backgroundColor('#0EA5E9')
-          .fontWeight(FontWeight.Medium)
-          .shadow({ radius: 10, color: 'rgba(14, 165, 233, 0.25)', offsetY: 4 })
-          .margin({ top: 12 })
-          .onClick(() => {
-            EventService.createTaskFromEvent(this.eventId);
-            this.taskGenerated = true;
-          })
-      }
-
-      if (this.taskGenerated) {
-        Row() {
-          Text('✓ 处置任务已生成，巡检团队已接入')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#16A34A')
-        }
-        .width('100%')
-        .padding(14)
-        .borderRadius(12)
-        .backgroundColor('#F0FDF4')
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 12 })
-      }
-    }
-    .width('100%')
-    .padding(16)
-  }
-
-  /* 【不可改】getEvent() 兜底对象字段与枚举值逐字保留 */
   private getEvent(): SecurityEvent {
     const event = EventService.getEventById(this.eventId);
 

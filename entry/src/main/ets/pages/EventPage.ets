@@ -3,24 +3,30 @@ import {
   EventPriority,
   EventStatus
 } from '../model/SecurityEvent';
-
 import { EventService } from '../service/EventService';
+
+interface PriorityFilter {
+  id: string;
+  label: string;
+}
 
 @Component
 export struct EventPage {
-  /* 【不可改】NavPathStack 必须保持普通成员变量（用 @Prop 传递会 SIGSEGV 闪退）；这段注释也别删 */
-  // 修复闪退：NavPathStack 不得用 @Prop 传递（@Prop 对对象做深拷贝，
-  // 拷贝副本的 pushPath 触发原生导航栈状态不一致 → JSNavPathStack::OnStateChanged SIGSEGV）。
-  // 按 ArkUI Navigation 官方规范改用普通成员变量，与 Index 的 pageStack 保持同一实例。
-  // 默认值仅用于满足 ArkTS 初始化约束；Index 构造 EventPage 时传入的 pageStack 会覆盖它。
   pageStack: NavPathStack = new NavPathStack();
 
-  /* 【不可改】@State 数据源与取值方式逐字保留 */
-  @State private events: SecurityEvent[] =
-    EventService.getAllEvents();
+  @State private events: SecurityEvent[] = EventService.getAllEvents();
+  @State private searchQuery: string = '';
+  @State private filterPriority: string = 'ALL';
 
-  // 优先级辅助背景色
-  private getPriorityBgColor(priority: EventPriority): string {
+  private filters: PriorityFilter[] = [
+    { id: 'ALL', label: '全部' },
+    { id: '紧急', label: '紧急' },
+    { id: '高', label: '较高' },
+    { id: '中', label: '中等' },
+    { id: '低', label: '普通' }
+  ];
+
+  private getPriorityBg(priority: EventPriority): string {
     if (priority === EventPriority.URGENT) {
       return '#FEF2F2';
     } else if (priority === EventPriority.HIGH) {
@@ -31,201 +37,250 @@ export struct EventPage {
     return '#F1F5F9';
   }
 
-  // 优先级辅助文字色
-  private getPriorityTextColor(priority: EventPriority): string {
+  private getPriorityColor(priority: EventPriority): string {
     if (priority === EventPriority.URGENT) {
       return '#DC2626';
     } else if (priority === EventPriority.HIGH) {
       return '#EA580C';
     } else if (priority === EventPriority.MEDIUM) {
-      return '#1B6EFF';
+      return '#2563EB';
     }
     return '#64748B';
   }
 
-  // 状态辅助文字色
   private getStatusColor(status: EventStatus): string {
     if (status === EventStatus.PENDING) {
-      return '#EA580C';
+      return '#B45309';
     } else if (status === EventStatus.CONFIRMED) {
-      return '#1B6EFF';
+      return '#2563EB';
     } else if (status === EventStatus.PROCESSING) {
-      return '#D97706';
+      return '#4F46E5';
     } else if (status === EventStatus.COMPLETED) {
-      return '#16A34A';
+      return '#059669';
     }
     return '#64748B';
+  }
+
+  private getFilteredEvents(): SecurityEvent[] {
+    const query: string = this.searchQuery.trim().toLowerCase();
+    return this.events.filter((event: SecurityEvent) => {
+      const matchPriority: boolean =
+        this.filterPriority === 'ALL' || event.priority === this.filterPriority;
+      const matchSearch: boolean =
+        query === '' ||
+        event.title.toLowerCase().includes(query) ||
+        event.location.toLowerCase().includes(query) ||
+        event.id.toLowerCase().includes(query);
+      return matchPriority && matchSearch;
+    });
   }
 
   build() {
     Column() {
-      // 头部标题与统计简述
-      Column() {
-        Row() {
-          Column() {
-            Text('安全事件')
-              .fontSize(26)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#0F172A')
-              .margin({ bottom: 4 })
+      // 顶部标题栏
+      Row() {
+        Text('‹')
+          .fontSize(30)
+          .fontColor('#334155')
+          .padding({ left: 4, right: 10 })
+          .onClick(() => {
+            this.pageStack.pop();
+          })
 
-            Text('校园安全事件列表 · 点击查看详情与指派')
-              .fontSize(13)
-              .fontColor('#64748B')
-          }
-          .alignItems(HorizontalAlign.Start)
+        Column() {
+          Text('安全事件')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#0F172A')
 
-          Blank()
-
-          // 计数徽章
-          Text(this.events.length.toString() + ' 项记录')
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#1B6EFF')
-            .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-            .backgroundColor('#EFF6FF')
-            .borderRadius(12)
+          Text('校园安全隐患汇聚与流转')
+            .fontSize(10)
+            .fontColor('#94A3B8')
+            .margin({ top: 2 })
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
+        .alignItems(HorizontalAlign.Start)
+
+        Blank()
+
+        Text(this.getFilteredEvents().length.toString() + ' 项')
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#2563EB')
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(12)
+          .backgroundColor('#EFF6FF')
+          .border({ width: 1, color: '#DBEAFE' })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 16, bottom: 12 })
+      .padding({ left: 12, right: 16, top: 14, bottom: 10 })
+      .backgroundColor(Color.White)
 
-      // 列表展示区
-      if (this.events.length === 0) {
-        Column({ space: 12 }) {
+      // 搜索与筛选
+      Column({ space: 10 }) {
+        TextInput({
+          placeholder: '搜索事件名称、地点或编号...',
+          text: this.searchQuery
+        })
+          .width('100%')
+          .height(40)
+          .fontSize(12)
+          .borderRadius(12)
+          .backgroundColor('#F1F5F9')
+          .border({ width: 1, color: '#E2E8F0' })
+          .padding({ left: 12, right: 12 })
+          .onChange((value: string) => {
+            this.searchQuery = value;
+          })
+
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(this.filters, (item: PriorityFilter) => {
+              Text(item.label)
+                .fontSize(11)
+                .fontWeight(this.filterPriority === item.id ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(this.filterPriority === item.id ? Color.White : '#64748B')
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .borderRadius(14)
+                .backgroundColor(this.filterPriority === item.id ? '#2563EB' : '#F1F5F9')
+                .onClick(() => {
+                  this.filterPriority = item.id;
+                })
+            }, (item: PriorityFilter) => item.id)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .scrollable(ScrollDirection.Horizontal)
+      }
+      .width('100%')
+      .padding({ left: 14, right: 14, top: 10, bottom: 12 })
+      .backgroundColor(Color.White)
+      .border({ width: { bottom: 1 }, color: '#E2E8F0' })
+
+      // 事件列表
+      if (this.getFilteredEvents().length === 0) {
+        Column({ space: 8 }) {
           Text('◆')
-            .fontSize(40)
-            .fontColor('#94A3B8')
-            .margin({ bottom: 8 })
-
-          Text('暂无待处理安全事件')
-            .fontSize(17)
+            .fontSize(34)
+            .fontColor('#CBD5E1')
+          Text('未找到符合条件的安全事件')
+            .fontSize(14)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#334155')
-
-          Text('当前校园运行平稳，所有上报已处理完毕')
-            .fontSize(13)
+            .fontColor('#475569')
+          Text('您可以调整检索词或切换优先级分类')
+            .fontSize(12)
             .fontColor('#94A3B8')
         }
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        List({ space: 14 }) {
-          ForEach(this.events, (event: SecurityEvent) => {
-            ListItem() {
+        Scroll() {
+          Column({ space: 12 }) {
+            ForEach(this.getFilteredEvents(), (event: SecurityEvent) => {
               Column() {
-                // 顶部标题与优先级徽章
                 Row() {
+                  Text(event.id)
+                    .fontSize(10)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#64748B')
+                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                    .borderRadius(8)
+                    .backgroundColor('#F1F5F9')
+
                   Text(event.title)
-                    .fontSize(17)
+                    .fontSize(15)
                     .fontWeight(FontWeight.Bold)
                     .fontColor('#0F172A')
+                    .margin({ left: 8 })
                     .layoutWeight(1)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-                  Row() {
-                    Text(event.priority)
-                      .fontSize(12)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(this.getPriorityTextColor(event.priority))
-                  }
-                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                  .borderRadius(8)
-                  .backgroundColor(this.getPriorityBgColor(event.priority))
+                  Text(event.priority)
+                    .fontSize(10)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(this.getPriorityColor(event.priority))
+                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                    .borderRadius(10)
+                    .backgroundColor(this.getPriorityBg(event.priority))
                 }
                 .width('100%')
-                .margin({ bottom: 12 })
+                .margin({ bottom: 10 })
 
-                // 核心属性两列矩阵
                 Column({ space: 6 }) {
                   Row() {
-                    Text('事件编号：' + event.id)
-                      .fontSize(13)
-                      .fontColor('#64748B')
+                    Text('发生地点')
+                      .fontSize(11)
+                      .fontColor('#94A3B8')
                       .layoutWeight(1)
-
-                    Text('状态：' + event.status)
-                      .fontSize(13)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor(this.getStatusColor(event.status))
+                    Text(event.location)
+                      .fontSize(11)
+                      .fontColor('#334155')
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .layoutWeight(1)
                   }
                   .width('100%')
 
                   Row() {
-                    Text('地点：' + event.location)
-                      .fontSize(13)
-                      .fontColor('#475569')
+                    Text('流转状态')
+                      .fontSize(11)
+                      .fontColor('#94A3B8')
                       .layoutWeight(1)
-
-                    Text('类型：' + event.type)
-                      .fontSize(13)
-                      .fontColor('#64748B')
+                    Text(event.status)
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.getStatusColor(event.status))
                   }
                   .width('100%')
                 }
                 .width('100%')
                 .padding(10)
-                .borderRadius(10)
+                .borderRadius(12)
                 .backgroundColor('#F8FAFC')
                 .margin({ bottom: 10 })
 
-                // 描述信息
                 Text(event.description)
-                  .fontSize(13)
-                  .fontColor('#334155')
-                  .lineHeight(19)
+                  .fontSize(12)
+                  .fontColor('#475569')
+                  .lineHeight(18)
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .width('100%')
                   .margin({ bottom: 10 })
 
-                // 底部信息与上报人
                 Row() {
-                  Text('上报人：' + event.reporter)
-                    .fontSize(12)
+                  Text(event.reporter)
+                    .fontSize(11)
                     .fontColor('#94A3B8')
-
                   Blank()
-
-                  Text('查看详情 ›')
-                    .fontSize(12)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor('#1B6EFF')
+                  Text('处置跟踪 ›')
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#2563EB')
                 }
                 .width('100%')
               }
               .width('100%')
-              .padding(16)
-              .borderRadius(16)
-              .backgroundColor('#FFFFFF')
-              .shadow({
-                radius: 10,
-                color: 'rgba(15, 23, 42, 0.05)',
-                offsetY: 3
+              .padding(14)
+              .borderRadius(18)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E2E8F0' })
+              .shadow({ radius: 10, color: 'rgba(15,23,42,0.04)', offsetY: 2 })
+              .onClick(() => {
+                EventService.setSelectedEventId(event.id);
+                this.pageStack.pushPath({ name: 'EventDetailPage' });
               })
-            }
-            /* 【不可改】点击行为：先写静态字段，再 pushPath 到 'EventDetailPage' */
-            .onClick(() => {
-              EventService.setSelectedEventId(event.id);
-
-              this.pageStack.pushPath({
-                name: 'EventDetailPage'
-              });
-            })
-          })
+            }, (event: SecurityEvent) => event.id)
+          }
+          .width('100%')
+          .padding({ left: 14, right: 14, top: 12, bottom: 24 })
         }
-        .height('100%')
         .width('100%')
         .layoutWeight(1)
-        .padding({
-          left: 16,
-          right: 16,
-          bottom: 16
-        })
+        .scrollBar(BarState.Off)
       }
     }
     .width('100%')
