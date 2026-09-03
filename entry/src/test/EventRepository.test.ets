@@ -161,22 +161,24 @@ export default function eventRepositoryTest() {
       expect(stored.length).assertEqual(0);
     });
 
-    it('event_service_seeds_empty_repository', 0, () => {
+    it('event_service_starts_empty_without_demo_cases', 0, () => {
       const events: SecurityEvent[] = EventService.getAllEvents();
-      expect(events.length).assertEqual(3);
-      expect(events[0].id).assertEqual('EVT001');
+      expect(events.length).assertEqual(0);
     });
 
-    it('event_service_seed_only_once', 0, () => {
+    it('event_service_empty_repository_accepts_new_event', 0, () => {
       EventService.getAllEvents();
-      EventRepository.getInstance().deleteEvent('EVT001');
+      EventRepository.getInstance().saveEvent(buildEvent('EVT100'));
       const events: SecurityEvent[] = EventService.getAllEvents();
-      expect(events.length).assertEqual(2);
+      expect(events.length).assertEqual(1);
+      expect(events[0].id).assertEqual('EVT100');
     });
 
     it('event_service_confirm_persists_to_repository', 0, () => {
+      const repo = EventRepository.getInstance();
+      repo.saveEvent(buildEvent('EVT001'));
       EventService.confirmEvent('EVT001');
-      const found = EventRepository.getInstance().getEventById('EVT001');
+      const found = repo.getEventById('EVT001');
       expect(found === undefined).assertFalse();
       if (found !== undefined) {
         expect(found.status).assertEqual(EventStatus.CONFIRMED);
@@ -184,6 +186,8 @@ export default function eventRepositoryTest() {
     });
 
     it('event_service_create_task_and_deduplicate', 0, () => {
+      const repo = EventRepository.getInstance();
+      repo.saveEvent(buildEvent('EVT003'));
       EventService.createTaskFromEvent('EVT003');
       expect(EventService.getAllTasks().length).assertEqual(1);
       expect(EventService.getAllTasks()[0].eventId).assertEqual('EVT003');
@@ -204,6 +208,7 @@ export default function eventRepositoryTest() {
     });
 
     it('event_service_get_my_task_list', 0, () => {
+      EventRepository.getInstance().saveEvent(buildEvent('EVT003'));
       EventService.createTaskFromEvent('EVT003');
       const myTasks = EventService.getMyTaskList('inspector_001');
       expect(myTasks.length).assertEqual(1);
@@ -213,6 +218,7 @@ export default function eventRepositoryTest() {
     });
 
     it('event_service_update_task_status', 0, () => {
+      EventRepository.getInstance().saveEvent(buildEvent('EVT003'));
       EventService.createTaskFromEvent('EVT003');
       const tasks = EventService.getAllTasks();
       expect(tasks.length).assertEqual(1);
