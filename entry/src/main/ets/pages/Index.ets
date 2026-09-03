@@ -24,7 +24,7 @@ struct Index {
   private pageStack: NavPathStack = new NavPathStack();
 
   @State private currentTab: string = 'Index';
-  @State private emergencyPhone: string = '';
+  @StorageLink('emergencyPhone') private emergencyPhone: string = '';
 
   // 开屏动画控制
   @State private splashVisible: boolean = true;

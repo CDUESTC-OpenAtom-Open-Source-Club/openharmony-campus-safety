@@ -13,6 +13,7 @@ export struct EmergencyContactPage {
     const context = getContext(this) as common.Context;
     EmergencyContactService.getPhone(context).then((value: string) => {
       this.phone = value;
+      AppStorage.setOrCreate('emergencyPhone', value);
     }).catch((err: Error) => {
       console.error('EmergencyContactService load failed: ' + err.message);
     });
@@ -26,6 +27,7 @@ export struct EmergencyContactPage {
     }
     const context = getContext(this) as common.Context;
     EmergencyContactService.savePhone(context, trimmed).then(() => {
+      AppStorage.setOrCreate('emergencyPhone', trimmed);
       promptAction.showToast({ message: '应急联系电话已保存' });
       this.pageStack.pop();
     }).catch((err: Error) => {
