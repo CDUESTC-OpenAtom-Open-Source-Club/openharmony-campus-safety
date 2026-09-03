@@ -1,8 +1,6 @@
 import {
   SecurityEvent,
-  EventStatus,
-  EventPriority,
-  EventType
+  EventStatus
 } from '../model/SecurityEvent';
 
 import {
@@ -15,41 +13,8 @@ import { EventRepository } from '../repository/EventRepository';
 export class EventService {
   private static selectedEventId: string = '';
 
-  private static seedEvents: SecurityEvent[] = [
-    {
-      id: 'EVT001',
-      title: '教学楼走廊漏水',
-      type: EventType.FACILITY,
-      location: '教学楼3楼',
-      description: '教学楼三楼走廊顶部出现漏水现象',
-      reporter: '张同学',
-      reportTime: '2026-08-25 09:30',
-      status: EventStatus.PENDING,
-      priority: EventPriority.HIGH
-    },
-    {
-      id: 'EVT002',
-      title: '实验室插座异常',
-      type: EventType.ELECTRIC,
-      location: '实验楼201',
-      description: '实验室墙面插座出现异常发热',
-      reporter: '李老师',
-      reportTime: '2026-08-25 10:15',
-      status: EventStatus.CONFIRMED,
-      priority: EventPriority.URGENT
-    },
-    {
-      id: 'EVT003',
-      title: '消防通道堆放杂物',
-      type: EventType.FIRE,
-      location: '宿舍楼1楼',
-      description: '消防通道存在杂物堆放情况',
-      reporter: '王同学',
-      reportTime: '2026-08-25 11:20',
-      status: EventStatus.PROCESSING,
-      priority: EventPriority.MEDIUM
-    }
-  ];
+  // 上架版本保持纯净空状态，不预置任何演示案例
+  private static seedEvents: SecurityEvent[] = [];
 
   static getAllEvents(): SecurityEvent[] {
     EventService.ensureSeeded();
