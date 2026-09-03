@@ -3,6 +3,7 @@ import { EventDetailPage } from './EventDetailPage';
 import { TaskPage } from './TaskPage';
 import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
+import { EmergencyContactPage } from './EmergencyContactPage';
 import {
   SecurityEvent,
   EventPriority,
@@ -13,6 +14,7 @@ import {
   TaskStatus
 } from '../model/Task';
 import { EventService } from '../service/EventService';
+import { EmergencyContactService } from '../service/EmergencyContactService';
 import { promptAction } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 
@@ -75,6 +77,19 @@ struct Index {
     }
     this.pageStack.clear();
     this.pageStack.pushPath({ name: name });
+  }
+
+  private refreshEmergencyPhone(): void {
+    const context = getContext(this) as common.Context;
+    EmergencyContactService.getPhone(context).then((value: string) => {
+      this.emergencyPhone = value;
+    }).catch((err: Error) => {
+      console.error('EmergencyContactService load failed: ' + err.message);
+    });
+  }
+
+  onPageShow(): void {
+    this.refreshEmergencyPhone();
   }
 
   private getUrgentCount(): number {
@@ -184,6 +199,15 @@ struct Index {
         })
       }
       .title('数据统计')
+      .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
+    } else if (name === 'EmergencyContactPage') {
+      NavDestination() {
+        EmergencyContactPage({
+          pageStack: this.pageStack
+        })
+      }
+      .title('应急联系方式')
       .hideTitleBar(true)
       .systemTransition(NavigationSystemTransitionType.FADE)
     }
@@ -500,26 +524,31 @@ struct Index {
                       .fontSize(12)
                       .fontWeight(FontWeight.Bold)
                       .fontColor('#1E293B')
+
+                    Blank()
+
+                    Text('配置 ›')
+                      .fontSize(10)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor('#2563EB')
                   }
                   .width('100%')
 
-                  TextInput({
-                    placeholder: '请输入紧急联系电话',
-                    text: this.emergencyPhone
-                  })
-                    .type(InputType.PhoneNumber)
+                  Text(
+                    this.emergencyPhone === ''
+                      ? '未配置，点击设置紧急联系电话'
+                      : this.emergencyPhone
+                  )
                     .fontSize(12)
-                    .height(38)
-                    .borderRadius(12)
-                    .backgroundColor('#F8FAFC')
-                    .border({ width: 1, color: '#E2E8F0' })
-                    .padding({ left: 12, right: 12 })
-                    .onChange((value: string) => {
-                      this.emergencyPhone = value;
-                    })
+                    .fontColor(this.emergencyPhone === '' ? '#94A3B8' : '#334155')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
+                .onClick(() => {
+                  this.pageStack.pushPath({ name: 'EmergencyContactPage' });
+                })
 
                 Button('一键求助')
                   .type(ButtonType.Normal)
@@ -534,7 +563,21 @@ struct Index {
                   .onClick(() => {
                     const phone = this.emergencyPhone.trim();
                     if (phone === '') {
-                      promptAction.showToast({ message: '请先填写紧急联系电话' });
+                      AlertDialog.show({
+                        title: '尚未配置应急联系电话',
+                        message: '请先设置接收紧急通知的电话号码',
+                        primaryButton: {
+                          value: '去配置',
+                          action: () => {
+                            this.pageStack.pushPath({ name: 'EmergencyContactPage' });
+                          }
+                        },
+                        secondaryButton: {
+                          value: '取消',
+                          action: () => {
+                          }
+                        }
+                      });
                       return;
                     }
                     const context = getContext(this) as common.UIAbilityContext;
