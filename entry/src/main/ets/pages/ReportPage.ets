@@ -14,6 +14,7 @@ interface TypeCard {
 export struct ReportPage {
   pageStack: NavPathStack = new NavPathStack();
 
+  @State private pageReady: boolean = false;
   @State private selectedTypeIndex: number = 0;
   @State private location: string = '';
   @State private description: string = '';
@@ -326,6 +327,12 @@ export struct ReportPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#F8FAFC')
+    .opacity(this.pageReady ? 1 : 0)
+    .translate({ y: this.pageReady ? 0 : 18 })
+    .animation({ duration: 320, curve: Curve.EaseOut })
+    .onAppear(() => {
+      this.pageReady = true;
+    })
   }
 
   @Builder

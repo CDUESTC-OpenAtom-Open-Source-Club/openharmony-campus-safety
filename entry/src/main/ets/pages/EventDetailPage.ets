@@ -10,6 +10,7 @@ import { EventService } from '../service/EventService';
 export struct EventDetailPage {
   pageStack: NavPathStack = new NavPathStack();
 
+  @State private pageReady: boolean = false;
   @State private eventId: string = EventService.getSelectedEventId();
   @State private isConfirmed: boolean = false;
   @State private taskGenerated: boolean = false;
@@ -355,6 +356,12 @@ export struct EventDetailPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#F8FAFC')
+    .opacity(this.pageReady ? 1 : 0)
+    .translate({ y: this.pageReady ? 0 : 18 })
+    .animation({ duration: 320, curve: Curve.EaseOut })
+    .onAppear(() => {
+      this.pageReady = true;
+    })
   }
 
   private getEvent(): SecurityEvent {

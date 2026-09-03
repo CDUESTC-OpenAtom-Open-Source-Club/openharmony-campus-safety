@@ -14,6 +14,7 @@ interface PriorityFilter {
 export struct EventPage {
   pageStack: NavPathStack = new NavPathStack();
 
+  @State private pageReady: boolean = false;
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private searchQuery: string = '';
   @State private filterPriority: string = 'ALL';
@@ -286,5 +287,11 @@ export struct EventPage {
     .width('100%')
     .height('100%')
     .backgroundColor('#F8FAFC')
+    .opacity(this.pageReady ? 1 : 0)
+    .translate({ y: this.pageReady ? 0 : 18 })
+    .animation({ duration: 320, curve: Curve.EaseOut })
+    .onAppear(() => {
+      this.pageReady = true;
+    })
   }
 }

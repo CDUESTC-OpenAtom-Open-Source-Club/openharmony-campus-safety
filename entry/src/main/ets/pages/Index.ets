@@ -159,16 +159,16 @@ struct Index {
     badgeColor: string,
     iconBg: string,
     iconColor: string,
-    iconText: string,
+    icon: Resource,
     route: string
   ) {
     Column() {
       Row() {
         Row() {
-          Text(iconText)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(iconColor)
+          Image(icon)
+            .width(22)
+            .height(22)
+            .fillColor(iconColor)
         }
         .width(42)
         .height(42)
@@ -213,11 +213,12 @@ struct Index {
   }
 
   @Builder
-  tabItem(key: string, label: string, icon: string) {
+  tabItem(key: string, label: string, icon: Resource) {
     Column() {
-      Text(icon)
-        .fontSize(18)
-        .fontColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
+      Image(icon)
+        .width(20)
+        .height(20)
+        .fillColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
       Text(label)
         .fontSize(10)
         .fontWeight(this.currentTab === key ? FontWeight.Bold : FontWeight.Normal)
@@ -238,16 +239,18 @@ struct Index {
       this.splashOffsetY = 0;
     });
 
+    // 进度条从 0 丝滑连续生长到 100%，避免分段跳变
+    this.getUIContext().animateTo({ duration: 1500, curve: Curve.EaseOut }, () => {
+      this.splashProgress = 100;
+    });
+
     this.timerProgress1 = setTimeout(() => {
-      this.splashProgress = 32;
       this.splashStepText = '连接校园物联网感知网格...';
     }, 400);
     this.timerProgress2 = setTimeout(() => {
-      this.splashProgress = 68;
       this.splashStepText = '校验 428 个安防巡检节点...';
     }, 900);
     this.timerProgress3 = setTimeout(() => {
-      this.splashProgress = 100;
       this.splashStepText = '鸿蒙智安守护网络已就绪';
     }, 1450);
 
@@ -297,10 +300,10 @@ struct Index {
               // ========================
               Row() {
                 Row() {
-                  Text('◆')
-                    .fontSize(20)
-                    .fontColor(Color.White)
-                    .fontWeight(FontWeight.Bold)
+                  Image($r('app.media.ic_shield_check'))
+                    .width(22)
+                    .height(22)
+                    .fillColor(Color.White)
                 }
                 .width(42)
                 .height(42)
@@ -510,7 +513,7 @@ struct Index {
                     '#2563EB',
                     '#EFF6FF',
                     '#2563EB',
-                    '△',
+                    $r('app.media.ic_event'),
                     'EventPage'
                   )
                   this.bentoCard(
@@ -520,7 +523,7 @@ struct Index {
                     '#059669',
                     '#ECFDF5',
                     '#059669',
-                    '□',
+                    $r('app.media.ic_report'),
                     'ReportPage'
                   )
                 }
@@ -534,7 +537,7 @@ struct Index {
                     '#D97706',
                     '#FFF7ED',
                     '#D97706',
-                    '▲',
+                    $r('app.media.ic_task'),
                     'TaskPage'
                   )
                   this.bentoCard(
@@ -544,7 +547,7 @@ struct Index {
                     '#7C3AED',
                     '#FAF5FF',
                     '#7C3AED',
-                    '◇',
+                    $r('app.media.ic_stats'),
                     'StatisticsPage'
                   )
                 }
@@ -644,15 +647,15 @@ struct Index {
         // 底部 TabBar
         // ========================
         Row() {
-          this.tabItem('Index', '首页', '●')
-          this.tabItem('EventPage', '事件', '△')
+          this.tabItem('Index', '首页', $r('app.media.ic_home'))
+          this.tabItem('EventPage', '事件', $r('app.media.ic_event'))
 
           Column() {
             Row() {
-              Text('+')
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Color.White)
+              Image($r('app.media.ic_report'))
+                .width(20)
+                .height(20)
+                .fillColor(Color.White)
             }
             .width(46)
             .height(46)
@@ -676,8 +679,8 @@ struct Index {
             this.navigateTo('ReportPage');
           })
 
-          this.tabItem('TaskPage', '任务', '✓')
-          this.tabItem('StatisticsPage', '统计', '◇')
+          this.tabItem('TaskPage', '任务', $r('app.media.ic_task'))
+          this.tabItem('StatisticsPage', '统计', $r('app.media.ic_stats'))
         }
         .width('100%')
         .height(62)
@@ -727,10 +730,10 @@ struct Index {
               .scale({ x: this.splashScale, y: this.splashScale })
 
             Row() {
-              Text('◆')
-                .fontSize(40)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Color.White)
+              Image($r('app.media.ic_shield'))
+                .width(44)
+                .height(44)
+                .fillColor(Color.White)
             }
             .width(92)
             .height(92)
@@ -797,7 +800,7 @@ struct Index {
                 .layoutWeight(1)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(this.splashProgress.toString() + '%')
+              Text(Math.round(this.splashProgress).toString() + '%')
                 .fontSize(10)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#93C5FD')
