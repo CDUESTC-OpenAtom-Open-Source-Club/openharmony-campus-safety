@@ -14,11 +14,13 @@ import {
 } from '../model/Task';
 import { EventService } from '../service/EventService';
 import { promptAction } from '@kit.ArkUI';
+import { common, Want } from '@kit.AbilityKit';
 
 @Entry
 @Component
 struct Index {
   private pageStack: NavPathStack = new NavPathStack();
+  private securityPhone: string = '110';
 
   @State private currentTab: string = 'Index';
 
@@ -493,7 +495,7 @@ struct Index {
                     .height(7)
                     .borderRadius(4)
                     .backgroundColor('#EF4444')
-                  Text('24H 校园保卫处总机')
+                  Text('24H 校园安全应急热线')
                     .fontSize(12)
                     .fontWeight(FontWeight.Bold)
                     .fontColor('#1E293B')
@@ -501,15 +503,25 @@ struct Index {
 
                 Blank()
 
-                Text('一键求助')
+                Button('一键求助')
+                  .type(ButtonType.Normal)
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#DC2626')
-                  .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                  .borderRadius(14)
                   .backgroundColor('#FEF2F2')
+                  .borderRadius(14)
+                  .height(34)
+                  .padding({ left: 14, right: 14 })
                   .onClick(() => {
-                    promptAction.showToast({ message: '已模拟拨通保卫处应急调度室' });
+                    const context = getContext(this) as common.UIAbilityContext;
+                    const want: Want = {
+                      action: 'ohos.want.action.dial',
+                      uri: 'tel:' + this.securityPhone
+                    };
+                    context.startAbility(want).then(() => {
+                    }).catch((err: Error) => {
+                      promptAction.showToast({ message: '无法打开拨号界面，请手动拨打 ' + this.securityPhone });
+                    });
                   })
               }
               .width('100%')
