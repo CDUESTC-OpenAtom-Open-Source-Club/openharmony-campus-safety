@@ -4,6 +4,9 @@ import { TaskPage } from './TaskPage';
 import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
 import { EmergencyContactPage } from './EmergencyContactPage';
+import { StudentSchedulePage } from './StudentSchedulePage';
+import { Course } from '../model/Course';
+import { ScheduleService } from '../service/ScheduleService';
 import {
   SecurityEvent,
   EventPriority,
@@ -40,6 +43,8 @@ struct Index {
   // 数据
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
+  @State private scheduleCourses: Course[] = [];
+  @State private showSchedulePage: boolean = false;
 
   private timerEnter: number = -1;
   private timerExit: number = -1;
@@ -79,6 +84,15 @@ struct Index {
     this.pageStack.pushPath({ name: name });
   }
 
+  private refreshSchedule(): void {
+    const context = getContext(this) as common.Context;
+    ScheduleService.getCourses(context).then((items: Course[]) => {
+      this.scheduleCourses = items;
+    }).catch((err: Error) => {
+      console.error('ScheduleService load failed: ' + err.message);
+    });
+  }
+
   private refreshEmergencyPhone(): void {
     const context = getContext(this) as common.Context;
     EmergencyContactService.getPhone(context).then((value: string) => {
@@ -90,6 +104,7 @@ struct Index {
 
   onPageShow(): void {
     this.refreshEmergencyPhone();
+    this.refreshSchedule();
   }
 
   private getUrgentCount(): number {
@@ -272,6 +287,146 @@ struct Index {
     .onClick(() => {
       this.navigateTo(route);
     })
+  }
+
+  private getHomeCourses(): Course[] {
+    const today: Course[] = this.scheduleCourses
+      .filter((course: Course) => course.weekday === 7)
+      .sort((a: Course, b: Course) => a.startPeriod - b.startPeriod);
+    return today.length > 0 ? today.slice(0, 3) : this.scheduleCourses.slice(0, 3);
+  }
+
+  @Builder
+  scheduleSection() {
+    Column({ space: 10 }) {
+      Row() {
+        Row({ space: 7 }) {
+          Row()
+            .width(32)
+            .height(32)
+            .borderRadius(10)
+            .linearGradient({
+              angle: 135,
+              colors: [['#2563EB', 0.0], ['#60A5FA', 1.0]]
+            })
+            .justifyContent(FlexAlign.Center)
+
+          Text('我的课表')
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#334155')
+        }
+
+        Blank()
+
+        Text('查看完整课表 ›')
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#2563EB')
+          .onClick(() => {
+            this.showSchedulePage = true;
+          })
+      }
+      .width('100%')
+
+      Column({ space: 0 }) {
+        Row() {
+          Text('今日 · 周日 · 第 3 周')
+            .fontSize(10)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#2563EB')
+            .backgroundColor('#EFF6FF')
+            .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+            .borderRadius(10)
+
+          Blank()
+
+          Text('共 ' + this.getHomeCourses().length + ' 节')
+            .fontSize(10)
+            .fontColor('#94A3B8')
+        }
+        .width('100%')
+        .margin({ bottom: 2 })
+
+        ForEach(this.getHomeCourses(), (course: Course, index: number) => {
+          this.homeCourseRow(
+            course.startTime,
+            '第' + course.startPeriod + '-' + course.endPeriod + '节',
+            course.name,
+            course.location,
+            index === 0 ? '进行中' : '待上课',
+            index === 0 ? '#ECFDF5' : '#EFF6FF',
+            index === 0 ? '#059669' : '#2563EB',
+            index === 0
+          )
+        }, (course: Course) => course.id)
+      }
+      .width('100%')
+      .padding(14)
+      .borderRadius(20)
+      .backgroundColor(Color.White)
+      .shadow({ radius: 12, color: 'rgba(15,23,42,0.05)', offsetY: 2 })
+      .onClick(() => {
+        this.showSchedulePage = true;
+      })
+
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 16 })
+    .opacity(this.homeReady ? 1 : 0)
+    .translate({ y: this.homeReady ? 0 : 20 })
+    .animation({ duration: 460, curve: Curve.EaseOut, delay: 380 })
+  }
+
+  @Builder
+  homeCourseRow(
+    time: string,
+    period: string,
+    name: string,
+    location: string,
+    status: string,
+    statusBg: string,
+    statusColor: string,
+    active: boolean
+  ) {
+    Row() {
+      Column({ space: 2 }) {
+        Text(time)
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#334155')
+        Text(period)
+          .fontSize(9)
+          .fontColor('#94A3B8')
+      }
+      .width(56)
+      .alignItems(HorizontalAlign.Start)
+
+      Column({ space: 3 }) {
+        Text(name)
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#334155')
+        Text('⌖ ' + location)
+          .fontSize(10)
+          .fontColor('#94A3B8')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      Text((active ? '● ' : '') + status)
+        .fontSize(9)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(statusColor)
+        .backgroundColor(statusBg)
+        .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+        .borderRadius(10)
+    }
+    .width('100%')
+    .padding({ top: 11, bottom: 11 })
+    .border({ width: { bottom: 1 }, color: '#F1F5F9' })
   }
 
   @Builder
@@ -770,6 +925,11 @@ struct Index {
               .opacity(this.homeReady ? 1 : 0)
               .translate({ y: this.homeReady ? 0 : 20 })
               .animation({ duration: 460, curve: Curve.EaseOut, delay: 320 })
+
+              // ========================
+              // 我的课表
+              // ========================
+              this.scheduleSection()
             }
             .width('100%')
           }
@@ -782,9 +942,10 @@ struct Index {
         .navDestination(this.pageMap)
 
         // ========================
-        // 底部 TabBar
+        // 底部 TabBar：课表二级页按设计稿隐藏
         // ========================
-        Row() {
+        if (!this.showSchedulePage) {
+          Row() {
           this.tabItem('Index', '首页', $r('app.media.ic_home'))
           this.tabItem('EventPage', '事件', $r('app.media.ic_event'))
 
@@ -821,12 +982,25 @@ struct Index {
           this.tabItem('StatisticsPage', '统计', $r('app.media.ic_stats'))
         }
         .width('100%')
-        .height(62)
-        .backgroundColor(Color.White)
-        .border({ width: 1, color: '#E2E8F0' })
+          .height(62)
+          .backgroundColor(Color.White)
+          .border({ width: 1, color: '#E2E8F0' })
+        }
       }
       .width('100%')
       .height('100%')
+
+      // ========================
+      // 学生课表二级页：在当前 App 内覆盖打开，不使用外部 Ability
+      // ========================
+      if (this.showSchedulePage) {
+        StudentSchedulePage({
+          context: getContext(this) as common.UIAbilityContext,
+          showSchedulePage: $showSchedulePage
+        })
+          .width('100%')
+          .height('100%')
+      }
 
       // ========================
       // 启动开屏动画
