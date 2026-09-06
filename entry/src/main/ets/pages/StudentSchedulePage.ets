@@ -6,7 +6,6 @@ import { ScheduleService } from '../service/ScheduleService';
 @Component
 export struct StudentSchedulePage {
   @Link showSchedulePage: boolean;
-  @Prop context: common.UIAbilityContext;
 
   @State private courses: Course[] = [];
   @State private editorVisible: boolean = false;
@@ -27,7 +26,7 @@ export struct StudentSchedulePage {
   ];
 
   aboutToAppear(): void {
-    ScheduleService.getCourses(this.context).then((items: Course[]) => {
+    ScheduleService.getCourses(getContext(this) as common.Context).then((items: Course[]) => {
       this.courses = items;
       this.loading = false;
     }).catch((error: Error) => {
@@ -38,7 +37,7 @@ export struct StudentSchedulePage {
   }
 
   private async persist(): Promise<void> {
-    await ScheduleService.saveCourses(this.context, this.courses);
+    await ScheduleService.saveCourses(getContext(this) as common.Context, this.courses);
   }
 
   private courseAt(weekday: number, period: number): Course | undefined {

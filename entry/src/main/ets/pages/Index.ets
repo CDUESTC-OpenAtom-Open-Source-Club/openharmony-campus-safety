@@ -995,7 +995,6 @@ struct Index {
       // ========================
       if (this.showSchedulePage) {
         StudentSchedulePage({
-          context: getContext(this) as common.UIAbilityContext,
           showSchedulePage: $showSchedulePage
         })
           .width('100%')
