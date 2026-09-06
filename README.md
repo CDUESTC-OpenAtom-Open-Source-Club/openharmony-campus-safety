@@ -6,7 +6,7 @@
 ![Stage](https://img.shields.io/badge/Model-Stage-success?style=flat-square)
 ![ArkUI-X](https://img.shields.io/badge/Cross--Platform-ArkUI--X-orange?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Beta-yellow?style=flat-square)
-![Version](https://img.shields.io/badge/Version-v0.1.0--beta.1-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v0.1.0--beta.2-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)
 
 基于 OpenHarmony / HarmonyOS 原生 ArkUI 与 ArkTS 开发的校园安全协同应用，覆盖「发现 - 确认 - 派单 - 处理 - 反馈 - 完成」的完整安全事件闭环，并通过 ArkUI-X 支持 Android 跨平台运行。
@@ -64,6 +64,7 @@
 | 7 | 开屏与切换动效 | 完成 | 开屏动画、页面淡入动效 |
 | 8 | Android 跨平台 | 完成 | ArkUI-X 打包与真机安装验证 |
 | 9 | 签名与发布 | 完成 | HAP 与 APK 签名，Beta Release 已发布 |
+| 10 | 学生课表 | 完成 | 校内课程表网格、课次切换与本地偏好存储 |
 
 ---
 
@@ -157,13 +158,13 @@ Debug APK 输出位置：
 
 | 平台 | 安装包 | 签名状态 | 说明 |
 | :--- | :--- | :--- | :--- |
-| HarmonyOS | `HongMengZhiAn-v0.1.0-beta.1-HarmonyOS-signed.hap` | 已签名 | Beta 测试版 |
-| Android | `HongMengZhiAn-v0.1.0-beta.1-Android.apk` | 已签名 | Beta 测试版 |
+| HarmonyOS | `HongMengZhiAn-v0.1.0-beta.2-HarmonyOS-signed.hap` | 已签名 | Beta 测试版 |
+| Android | `HongMengZhiAn-v0.1.0-beta.2-Android.apk` | 已签名 | Beta 测试版 |
 
 发布地址：
 
 ```text
-https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.1
+https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.2
 ```
 
 ---

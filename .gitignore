@@ -16,6 +16,8 @@
 /.arkui-x/android/local.properties
 /.arkui-x/android/app/libs/
 /.arkui-x/android/app/src/main/assets/
+/.arkui-x/ios/arkui-x/
+/.arkui-x/build/
 
 # 项目规范与文档（不提交仓库）
 /C_MODULE_SPEC.md
