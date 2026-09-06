@@ -9,12 +9,12 @@
 **Tech Stack:** ArkTS / ArkUI（复用模型）、ArkData relationalStore（API 20）、Hypium 单元测试（本地 Node 可跑 async 用例）。
 
 **关键环境（已验证，勿重复验证）：**
-- 命令行构建/测试命令（git-bash）：
+- 命令行构建/测试命令（git-bash，仓库根目录执行；DevEco 安装位置随机器而异，入库不写死绝对路径）：
   ```bash
-  cd "f:/OpenHarmony/OpenHarmonyCampusSafety"
-  export DEVECO_SDK_HOME="F:/OpenHarmony/IDE/DevEco Studio/sdk"
-  export NODE_HOME="F:/OpenHarmony/IDE/DevEco Studio/tools/node"
-  HV="F:/OpenHarmony/IDE/DevEco Studio/tools/node/node.exe F:/OpenHarmony/IDE/DevEco Studio/tools/hvigor/bin/hvigorw.js"
+  D="<DevEco安装目录>"                 # 按本机实际安装位置设置（sdk 与 tools 通常并列）
+  export DEVECO_SDK_HOME="$D/sdk"
+  export NODE_HOME="$D/tools/node"
+  HV="$D/tools/node/node.exe $D/tools/hvigor/bin/hvigorw.js"
   "$HV" test --no-daemon            # 本地单元测试
   "$HV" assembleHap --mode module -p product=default -p buildMode=debug --no-daemon   # 编译
   ```
