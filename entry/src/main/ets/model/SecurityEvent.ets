@@ -28,6 +28,7 @@ export interface SecurityEvent {
   location: string;
   description: string;
   reporter: string;
+  reporterId?: string;
   reportTime: string;
   status: EventStatus;
   priority: EventPriority;

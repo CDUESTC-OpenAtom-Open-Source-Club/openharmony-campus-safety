@@ -73,6 +73,7 @@ export class EventRepository {
           location: seed.location,
           description: seed.description,
           reporter: seed.reporter,
+          reporterId: seed.reporterId,
           reportTime: seed.reportTime,
           status: seed.status,
           priority: seed.priority,

@@ -17,6 +17,8 @@ import { MemoryEventStore } from '../main/ets/repository/store/MemoryEventStore'
 import { EventRepository } from '../main/ets/repository/EventRepository';
 
 import { EventService } from '../main/ets/service/EventService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN } from './TestAuthFixture';
 
 function buildEvent(id: string): SecurityEvent {
   return {
@@ -48,6 +50,7 @@ function buildTask(id: string, eventId: string): Task {
 export default function eventRepositoryTest() {
   describe('EventRepositoryTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 

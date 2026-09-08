@@ -5,6 +5,9 @@ import {
   EventPriority
 } from '../model/SecurityEvent';
 import { EventService } from '../service/EventService';
+import { AccountService } from '../service/AccountService';
+import { AppPermission, PermissionService } from '../service/PermissionService';
+import { User } from '../model/User';
 
 @Component
 export struct EventDetailPage {
@@ -14,6 +17,15 @@ export struct EventDetailPage {
   @State private eventId: string = EventService.getSelectedEventId();
   @State private isConfirmed: boolean = false;
   @State private taskGenerated: boolean = false;
+  @State private selectedAssigneeId: string = 'inspector_001';
+
+  private can(permission: AppPermission): boolean {
+    return PermissionService.can(AccountService.getCurrentUser(), permission);
+  }
+
+  private getSecurityUsers(): User[] {
+    return AccountService.getSecurityUsers();
+  }
 
   @Builder
   flowNode(
@@ -278,7 +290,8 @@ export struct EventDetailPage {
             // 操作按钮
             if (
               this.getEvent().status === EventStatus.PENDING &&
-              !this.isConfirmed
+              !this.isConfirmed &&
+              this.can(AppPermission.CONFIRM_EVENT)
             ) {
               Button('确认事件属实')
                 .width('100%')
@@ -298,8 +311,32 @@ export struct EventDetailPage {
             if (
               (this.getEvent().status === EventStatus.CONFIRMED ||
                 this.isConfirmed) &&
-              !this.taskGenerated
+              !this.taskGenerated &&
+              this.can(AppPermission.DISPATCH_TASK)
             ) {
+              Column({ space: 8 }) {
+                Text('选择处置人员')
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#475569')
+                  .width('100%')
+
+                Row({ space: 8 }) {
+                  ForEach(this.getSecurityUsers(), (user: User) => {
+                    Text(user.name)
+                      .fontSize(11)
+                      .fontWeight(this.selectedAssigneeId === user.id ? FontWeight.Bold : FontWeight.Normal)
+                      .fontColor(this.selectedAssigneeId === user.id ? Color.White : '#475569')
+                      .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+                      .borderRadius(12)
+                      .backgroundColor(this.selectedAssigneeId === user.id ? '#2563EB' : '#F1F5F9')
+                      .onClick(() => {
+                        this.selectedAssigneeId = user.id;
+                      })
+                  }, (user: User) => user.id)
+                }
+                .width('100%')
+
               Button('下发并生成现场处置任务')
                 .width('100%')
                 .height(46)
@@ -311,9 +348,12 @@ export struct EventDetailPage {
                 .shadow({ radius: 10, color: 'rgba(14,165,233,0.25)', offsetY: 4 })
                 .margin({ top: 10 })
                 .onClick(() => {
-                  EventService.createTaskFromEvent(this.eventId);
-                  this.taskGenerated = true;
+                  if (EventService.createTaskFromEvent(this.eventId, this.selectedAssigneeId)) {
+                    this.taskGenerated = true;
+                  }
                 })
+              }
+              .width('100%')
             }
 
             if (this.taskGenerated) {
@@ -361,6 +401,7 @@ export struct EventDetailPage {
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
       this.pageReady = true;
+      this.taskGenerated = EventService.getTaskByEventId(this.eventId) !== undefined;
     })
   }
 

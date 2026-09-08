@@ -9,6 +9,9 @@ import {
 } from '../model/Task';
 
 import { EventRepository } from '../repository/EventRepository';
+import { AccountService } from './AccountService';
+import { AppPermission, PermissionService } from './PermissionService';
+import { User, UserRole } from '../model/User';
 
 export class EventService {
   private static selectedEventId: string = '';
@@ -18,10 +21,31 @@ export class EventService {
 
   static getAllEvents(): SecurityEvent[] {
     EventService.ensureSeeded();
-    return EventRepository.getInstance().getEvents();
+    const repository: EventRepository = EventRepository.getInstance();
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (currentUser === null) {
+      return [];
+    }
+    if (currentUser.role === UserRole.ADMIN) {
+      return repository.getEvents();
+    }
+    if (currentUser.role === UserRole.SECURITY) {
+      const assignedEventIds: string[] = repository.getAllTasks()
+        .filter((task: Task) => task.assignee === currentUser.id)
+        .map((task: Task) => task.eventId);
+      return repository.getEvents().filter(
+        (event: SecurityEvent) => assignedEventIds.includes(event.id)
+      );
+    }
+    return repository.getEvents().filter(
+      (event: SecurityEvent) => event.reporterId === currentUser.id
+    );
   }
 
   static getPendingEvents(): SecurityEvent[] {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.CONFIRM_EVENT)) {
+      return [];
+    }
     EventService.ensureSeeded();
     return EventRepository.getInstance().getEvents().filter(
       (event: SecurityEvent) => event.status === EventStatus.PENDING
@@ -42,6 +66,9 @@ export class EventService {
   }
 
   static confirmEvent(id: string): boolean {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.CONFIRM_EVENT)) {
+      return false;
+    }
     const event = EventService.getEventById(id);
 
     if (event === undefined || event.status !== EventStatus.PENDING) {
@@ -53,9 +80,16 @@ export class EventService {
   }
 
   static createTaskFromEvent(id: string, assignee: string = 'inspector_001'): boolean {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.DISPATCH_TASK)) {
+      return false;
+    }
     const event = EventService.getEventById(id);
 
-    if (event === undefined || event.status !== EventStatus.CONFIRMED || assignee.trim() === '') {
+    const normalizedAssignee: string = assignee.trim();
+    const isSecurityAccount: boolean = AccountService.getSecurityUsers().some(
+      (user: User) => user.id === normalizedAssignee
+    );
+    if (event === undefined || event.status !== EventStatus.CONFIRMED || !isSecurityAccount) {
       return false;
     }
 
@@ -71,7 +105,7 @@ export class EventService {
       title: event.title,
       location: event.location,
       description: event.description,
-      assignee: assignee.trim(),
+      assignee: normalizedAssignee,
       createTime: event.reportTime,
       status: TaskStatus.PENDING
     };
@@ -83,10 +117,29 @@ export class EventService {
   }
 
   static getAllTasks(): Task[] {
-    return EventRepository.getInstance().getAllTasks();
+    const tasks: Task[] = EventRepository.getInstance().getAllTasks();
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (currentUser === null) {
+      return [];
+    }
+    if (currentUser.role === UserRole.ADMIN) {
+      return tasks;
+    }
+    if (currentUser.role === UserRole.SECURITY) {
+      return tasks.filter((task: Task) => task.assignee === currentUser.id);
+    }
+    return [];
   }
   static getMyTaskList(userId: string): Task[] {
     return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
+  }
+
+  static getTaskByEventId(eventId: string): Task | undefined {
+    const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(eventId);
+    if (task === undefined) {
+      return undefined;
+    }
+    return EventService.getAllTasks().find((visibleTask: Task) => visibleTask.id === task.id);
   }
 
   static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): boolean {
@@ -100,9 +153,14 @@ export class EventService {
   }
 
   static startTask(taskId: string): boolean {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (!PermissionService.can(currentUser, AppPermission.START_TASK)) {
+      return false;
+    }
     const repository = EventRepository.getInstance();
     const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
-    if (task === undefined || task.status !== TaskStatus.PENDING) {
+    if (task === undefined || task.status !== TaskStatus.PENDING ||
+      (currentUser?.role !== UserRole.ADMIN && task.assignee !== currentUser?.id)) {
       return false;
     }
     task.status = TaskStatus.PROCESSING;
@@ -117,10 +175,15 @@ export class EventService {
   }
 
   static submitTaskForReview(taskId: string, result: string): boolean {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (!PermissionService.can(currentUser, AppPermission.SUBMIT_TASK)) {
+      return false;
+    }
     const repository = EventRepository.getInstance();
     const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
     const trimmedResult: string = result.trim();
-    if (task === undefined || task.status !== TaskStatus.PROCESSING || trimmedResult === '') {
+    if (task === undefined || task.status !== TaskStatus.PROCESSING || trimmedResult === '' ||
+      (currentUser?.role !== UserRole.ADMIN && task.assignee !== currentUser?.id)) {
       return false;
     }
     task.status = TaskStatus.REVIEW;
@@ -137,6 +200,9 @@ export class EventService {
   }
 
   static approveTask(taskId: string): boolean {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.REVIEW_TASK)) {
+      return false;
+    }
     const repository = EventRepository.getInstance();
     const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
     if (task === undefined || task.status !== TaskStatus.REVIEW) {
@@ -154,6 +220,9 @@ export class EventService {
   }
 
   static rejectTask(taskId: string, reason: string): boolean {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.REVIEW_TASK)) {
+      return false;
+    }
     const repository = EventRepository.getInstance();
     const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
     const trimmedReason: string = reason.trim();

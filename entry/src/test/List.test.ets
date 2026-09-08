@@ -3,6 +3,7 @@ import eventSimulatorTest from './EventSimulator.test';
 import eventRepositoryTest from './EventRepository.test';
 import eventWorkflowTest from './EventWorkflow.test';
 import stabilityTest from './Stability.test';
+import permissionTest from './Permission.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -10,4 +11,5 @@ export default function testsuite() {
   eventRepositoryTest();
   eventWorkflowTest();
   stabilityTest();
+  permissionTest();
 }

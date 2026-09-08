@@ -5,6 +5,8 @@ import {
 import {
   EventService
 } from '../service/EventService';
+import { AccountService } from '../service/AccountService';
+import { AppPermission, PermissionService } from '../service/PermissionService';
 
 interface TaskFilter {
   id: string;
@@ -64,6 +66,10 @@ export struct TaskPage {
 
   private refreshTasks(): void {
     this.tasks = EventService.getAllTasks().slice();
+  }
+
+  private can(permission: AppPermission): boolean {
+    return PermissionService.can(AccountService.getCurrentUser(), permission);
   }
 
   private confirmSubmit(task: Task): void {
@@ -253,7 +259,7 @@ export struct TaskPage {
                   .width('100%')
                   .margin({ bottom: 12 })
 
-                if (task.status === TaskStatus.PENDING) {
+                if (task.status === TaskStatus.PENDING && this.can(AppPermission.START_TASK)) {
                   Button('接单并开始处置')
                     .width('100%')
                     .height(42)
@@ -271,7 +277,7 @@ export struct TaskPage {
                     })
                 }
 
-                if (task.status === TaskStatus.PROCESSING) {
+                if (task.status === TaskStatus.PROCESSING && this.can(AppPermission.SUBMIT_TASK)) {
                   Column({ space: 8 }) {
                     TextInput({
                       placeholder: '请输入现场处置措施与结果反馈...',
@@ -322,58 +328,69 @@ export struct TaskPage {
                       .backgroundColor('#F5F3FF')
                       .border({ width: 1, color: '#DDD6FE' })
 
-                    TextInput({
-                      placeholder: '驳回时请输入返工原因...',
-                      text: this.reviewTaskId === task.id ? this.rejectionReason : ''
-                    })
+                    if (this.can(AppPermission.REVIEW_TASK)) {
+                      TextInput({
+                        placeholder: '驳回时请输入返工原因...',
+                        text: this.reviewTaskId === task.id ? this.rejectionReason : ''
+                      })
+                        .width('100%')
+                        .height(42)
+                        .fontSize(12)
+                        .borderRadius(12)
+                        .backgroundColor('#F8FAFC')
+                        .border({ width: 1, color: '#CBD5E1' })
+                        .padding({ left: 10, right: 10 })
+                        .onFocus(() => {
+                          this.reviewTaskId = task.id;
+                        })
+                        .onChange((value: string) => {
+                          this.reviewTaskId = task.id;
+                          this.rejectionReason = value;
+                        })
+
+                      Row({ space: 8 }) {
+                        Button('驳回返工')
+                          .layoutWeight(1)
+                          .height(42)
+                          .borderRadius(12)
+                          .backgroundColor('#DC2626')
+                          .fontColor(Color.White)
+                          .fontSize(12)
+                          .onClick(() => {
+                            if (this.rejectionReason.trim() !== '' &&
+                              EventService.rejectTask(task.id, this.rejectionReason)) {
+                              this.reviewTaskId = '';
+                              this.rejectionReason = '';
+                              this.refreshTasks();
+                            }
+                          })
+
+                        Button('审核通过')
+                          .layoutWeight(1)
+                          .height(42)
+                          .borderRadius(12)
+                          .backgroundColor('#059669')
+                          .fontColor(Color.White)
+                          .fontSize(12)
+                          .onClick(() => {
+                            if (EventService.approveTask(task.id)) {
+                              this.reviewTaskId = '';
+                              this.rejectionReason = '';
+                              this.refreshTasks();
+                            }
+                          })
+                      }
                       .width('100%')
-                      .height(42)
-                      .fontSize(12)
-                      .borderRadius(12)
-                      .backgroundColor('#F8FAFC')
-                      .border({ width: 1, color: '#CBD5E1' })
-                      .padding({ left: 10, right: 10 })
-                      .onFocus(() => {
-                        this.reviewTaskId = task.id;
-                      })
-                      .onChange((value: string) => {
-                        this.reviewTaskId = task.id;
-                        this.rejectionReason = value;
-                      })
-
-                    Row({ space: 8 }) {
-                      Button('驳回返工')
-                        .layoutWeight(1)
-                        .height(42)
+                    } else {
+                      Text('处置结果已提交，等待管理员审核')
+                        .fontSize(11)
+                        .fontColor('#7C3AED')
+                        .width('100%')
+                        .textAlign(TextAlign.Center)
+                        .padding(10)
                         .borderRadius(12)
-                        .backgroundColor('#DC2626')
-                        .fontColor(Color.White)
-                        .fontSize(12)
-                        .onClick(() => {
-                          if (this.rejectionReason.trim() !== '' &&
-                            EventService.rejectTask(task.id, this.rejectionReason)) {
-                            this.reviewTaskId = '';
-                            this.rejectionReason = '';
-                            this.refreshTasks();
-                          }
-                        })
-
-                      Button('审核通过')
-                        .layoutWeight(1)
-                        .height(42)
-                        .borderRadius(12)
-                        .backgroundColor('#059669')
-                        .fontColor(Color.White)
-                        .fontSize(12)
-                        .onClick(() => {
-                          if (EventService.approveTask(task.id)) {
-                            this.reviewTaskId = '';
-                            this.rejectionReason = '';
-                            this.refreshTasks();
-                          }
-                        })
+                        .backgroundColor('#F5F3FF')
                     }
-                    .width('100%')
                   }
                   .width('100%')
                 }

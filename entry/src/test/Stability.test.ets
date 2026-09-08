@@ -19,6 +19,8 @@ import { EventRepository } from '../main/ets/repository/EventRepository';
 import { EventService } from '../main/ets/service/EventService';
 
 import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN } from './TestAuthFixture';
 
 /**
  * 稳定性与重启恢复测试（C 模块 M4）
@@ -30,6 +32,7 @@ import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
 export default function stabilityTest() {
   describe('StabilityTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 

@@ -5,6 +5,8 @@ import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
 import { EmergencyContactPage } from './EmergencyContactPage';
 import { StudentSchedulePage } from './StudentSchedulePage';
+import { LoginPage } from './LoginPage';
+import { AccountPage } from './AccountPage';
 import { Course } from '../model/Course';
 import { ScheduleService } from '../service/ScheduleService';
 import {
@@ -18,6 +20,9 @@ import {
 } from '../model/Task';
 import { EventService } from '../service/EventService';
 import { EmergencyContactService } from '../service/EmergencyContactService';
+import { AccountService } from '../service/AccountService';
+import { AppPermission, PermissionService } from '../service/PermissionService';
+import { User } from '../model/User';
 import { promptAction } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 
@@ -27,6 +32,7 @@ struct Index {
   private pageStack: NavPathStack = new NavPathStack();
 
   @State private currentTab: string = 'Index';
+  @State private loggedIn: boolean = AccountService.isLoggedIn();
   @StorageLink('emergencyPhone') private emergencyPhone: string = '';
 
   // 开屏动画控制
@@ -75,6 +81,12 @@ struct Index {
   }
 
   private navigateTo(name: string): void {
+    if (name === 'TaskPage' && !this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
+      return;
+    }
+    if (name === 'StatisticsPage' && !this.can(AppPermission.VIEW_STATISTICS)) {
+      return;
+    }
     this.currentTab = name;
     if (name === 'Index') {
       this.pageStack.clear();
@@ -82,6 +94,22 @@ struct Index {
     }
     this.pageStack.clear();
     this.pageStack.pushPath({ name: name });
+  }
+
+  private can(permission: AppPermission): boolean {
+    return PermissionService.can(AccountService.getCurrentUser(), permission);
+  }
+
+  private currentUser(): User | null {
+    return AccountService.getCurrentUser();
+  }
+
+  private completeLogout(): void {
+    this.pageStack.clear();
+    this.currentTab = 'Index';
+    this.events = [];
+    this.tasks = [];
+    this.loggedIn = false;
   }
 
   private refreshSchedule(): void {
@@ -223,6 +251,16 @@ struct Index {
         })
       }
       .title('应急联系方式')
+      .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE)
+    } else if (name === 'AccountPage') {
+      NavDestination() {
+        AccountPage({
+          pageStack: this.pageStack,
+          onLogout: (): void => this.completeLogout()
+        })
+      }
+      .title('账号与安全')
       .hideTitleBar(true)
       .systemTransition(NavigationSystemTransitionType.FADE)
     }
@@ -507,7 +545,16 @@ struct Index {
   }
 
   build() {
-    Stack() {
+    if (!this.loggedIn) {
+      LoginPage({
+        onLogin: (): void => {
+          this.loggedIn = true;
+          this.events = EventService.getAllEvents().slice();
+          this.tasks = EventService.getAllTasks().slice();
+        }
+      })
+    } else {
+      Stack() {
       Column() {
         Navigation(this.pageStack) {
           Scroll() {
@@ -560,20 +607,16 @@ struct Index {
                 Blank()
 
                 Row({ space: 5 }) {
-                  Row()
-                    .width(7)
-                    .height(7)
-                    .borderRadius(4)
-                    .backgroundColor('#10B981')
-                  Text('守护中')
+                  Text(this.currentUser()?.role ?? '')
                     .fontSize(11)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor('#047857')
+                    .fontColor('#1D4ED8')
                 }
                 .padding({ left: 10, right: 10, top: 6, bottom: 6 })
                 .borderRadius(16)
-                .backgroundColor('#ECFDF5')
-                .border({ width: 1, color: '#A7F3D0' })
+                .backgroundColor('#EFF6FF')
+                .border({ width: 1, color: '#BFDBFE' })
+                .onClick(() => this.navigateTo('AccountPage'))
               }
               .width('100%')
               .padding({ left: 16, right: 16, top: 16, bottom: 12 })
@@ -809,26 +852,30 @@ struct Index {
                 .layoutWeight(1)
 
                 Column({ space: 10 }) {
-                  this.bentoCard(
-                    '处置任务',
-                    '巡检维保现场接单',
-                    this.getPendingTaskCount().toString() + ' 待办',
-                    '#D97706',
-                    '#FFF7ED',
-                    '#D97706',
-                    $r('app.media.ic_task'),
-                    'TaskPage'
-                  )
-                  this.bentoCard(
-                    '数据统计',
-                    '安全全景量化分析',
-                    '态势洞察',
-                    '#7C3AED',
-                    '#FAF5FF',
-                    '#7C3AED',
-                    $r('app.media.ic_stats'),
-                    'StatisticsPage'
-                  )
+                  if (this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
+                    this.bentoCard(
+                      '处置任务',
+                      '巡检维保现场接单',
+                      this.getPendingTaskCount().toString() + ' 待办',
+                      '#D97706',
+                      '#FFF7ED',
+                      '#D97706',
+                      $r('app.media.ic_task'),
+                      'TaskPage'
+                    )
+                  }
+                  if (this.can(AppPermission.VIEW_STATISTICS)) {
+                    this.bentoCard(
+                      '数据统计',
+                      '安全全景量化分析',
+                      '态势洞察',
+                      '#7C3AED',
+                      '#FAF5FF',
+                      '#7C3AED',
+                      $r('app.media.ic_stats'),
+                      'StatisticsPage'
+                    )
+                  }
                 }
                 .layoutWeight(1)
               }
@@ -978,8 +1025,12 @@ struct Index {
             this.navigateTo('ReportPage');
           })
 
-          this.tabItem('TaskPage', '任务', $r('app.media.ic_task'))
-          this.tabItem('StatisticsPage', '统计', $r('app.media.ic_stats'))
+          if (this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
+            this.tabItem('TaskPage', '任务', $r('app.media.ic_task'))
+          }
+          if (this.can(AppPermission.VIEW_STATISTICS)) {
+            this.tabItem('StatisticsPage', '统计', $r('app.media.ic_stats'))
+          }
         }
         .width('100%')
           .height(62)
@@ -1141,5 +1192,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
+    }
   }
 }

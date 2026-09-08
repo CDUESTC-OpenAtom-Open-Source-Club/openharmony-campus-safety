@@ -19,10 +19,13 @@ import { EventRepository } from '../main/ets/repository/EventRepository';
 import { EventService } from '../main/ets/service/EventService';
 
 import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN, TEST_STUDENT } from './TestAuthFixture';
 
 export default function eventWorkflowTest() {
   describe('EventWorkflowTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 
@@ -247,6 +250,7 @@ export default function eventWorkflowTest() {
     });
 
     it('workflow_report_hazard_saves_pending_event', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
       const repo = EventRepository.getInstance();
       const before: number = repo.getEvents().length;
       const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
@@ -262,12 +266,14 @@ export default function eventWorkflowTest() {
         expect(event.status).assertEqual(EventStatus.PENDING);
         expect(event.type).assertEqual(EventType.FACILITY);
         expect(event.location).assertEqual('教学楼2层东侧');
-        expect(event.reporter).assertEqual('张三');
+        expect(event.reporter).assertEqual(TEST_STUDENT.name);
+        expect(event.reporterId).assertEqual(TEST_STUDENT.id);
         expect(repo.getEventById(event.id) === undefined).assertFalse();
       }
     });
 
     it('workflow_report_hazard_trims_and_applies_defaults', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
       const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
         title: '  楼道应急灯破损  ',
         type: EventType.FACILITY,
@@ -279,7 +285,8 @@ export default function eventWorkflowTest() {
       if (event !== undefined) {
         expect(event.title).assertEqual('楼道应急灯破损');
         expect(event.location).assertEqual('教学楼2层东侧');
-        expect(event.reporter).assertEqual('学生上报');
+        expect(event.reporter).assertEqual(TEST_STUDENT.name);
+        expect(event.reporterId).assertEqual(TEST_STUDENT.id);
         expect(event.priority).assertEqual(EventPriority.MEDIUM);
       }
     });

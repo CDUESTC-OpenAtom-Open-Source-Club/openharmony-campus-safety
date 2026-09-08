@@ -11,7 +11,7 @@ import { Task, TaskStatus } from '../../model/Task';
 import { EventStore } from './EventStore';
 
 const DB_NAME: string = 'campus_safety.db';
-const DB_VERSION: number = 3;
+const DB_VERSION: number = 4;
 
 /**
  * relationalStore 存储实现（C 模块，真机/云手机用）。
@@ -40,7 +40,7 @@ export class RdbEventStore implements EventStore {
     await this.rdbStore.executeSql(
       'CREATE TABLE IF NOT EXISTS security_event (' +
       'id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL, ' +
-      'location TEXT NOT NULL, description TEXT NOT NULL, reporter TEXT NOT NULL, ' +
+      'location TEXT NOT NULL, description TEXT NOT NULL, reporter TEXT NOT NULL, reporterId TEXT, ' +
       'reportTime TEXT NOT NULL, status TEXT NOT NULL, priority TEXT NOT NULL, handler TEXT)'
     );
     await this.rdbStore.executeSql(
@@ -51,9 +51,14 @@ export class RdbEventStore implements EventStore {
       'submittedTime TEXT, rejectionReason TEXT)'
     );
 
+    const eventColumns: string[] = await this.getTableColumns('security_event');
+    if (!eventColumns.includes('reporterId')) {
+      await this.rdbStore.executeSql('ALTER TABLE security_event ADD COLUMN reporterId TEXT');
+    }
+
     // v1 的 task 表没有处理结果和完成时间。按实际列状态执行幂等迁移，
     // 兼容已发布旧库，也能安全恢复上次启动时被中断的部分迁移。
-    const taskColumns: string[] = await this.getTaskColumns();
+    const taskColumns: string[] = await this.getTableColumns('task');
     if (!taskColumns.includes('result')) {
       await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN result TEXT');
     }
@@ -71,8 +76,9 @@ export class RdbEventStore implements EventStore {
     }
   }
 
-  private async getTaskColumns(): Promise<string[]> {
-    const resultSet: relationalStore.ResultSet = await this.rdbStore.querySql('PRAGMA table_info(task)');
+  private async getTableColumns(tableName: string): Promise<string[]> {
+    const resultSet: relationalStore.ResultSet =
+      await this.rdbStore.querySql('PRAGMA table_info(' + tableName + ')');
     const columns: string[] = [];
     try {
       const nameColumnIndex: number = resultSet.getColumnIndex('name');
@@ -155,6 +161,7 @@ export class RdbEventStore implements EventStore {
 
   private eventToBucket(event: SecurityEvent): ValuesBucket {
     const handler: string | null = event.handler === undefined ? null : event.handler;
+    const reporterId: string | null = event.reporterId === undefined ? null : event.reporterId;
     const bucket: ValuesBucket = {
       'id': event.id,
       'title': event.title,
@@ -162,6 +169,7 @@ export class RdbEventStore implements EventStore {
       'location': event.location,
       'description': event.description,
       'reporter': event.reporter,
+      'reporterId': reporterId,
       'reportTime': event.reportTime,
       'status': event.status,
       'priority': event.priority,
@@ -172,6 +180,7 @@ export class RdbEventStore implements EventStore {
 
   private rowToEvent(resultSet: relationalStore.ResultSet): SecurityEvent {
     const handlerValue: string = resultSet.getString(resultSet.getColumnIndex('handler'));
+    const reporterIdValue: string = resultSet.getString(resultSet.getColumnIndex('reporterId'));
     const event: SecurityEvent = {
       id: resultSet.getString(resultSet.getColumnIndex('id')),
       title: resultSet.getString(resultSet.getColumnIndex('title')),
@@ -179,6 +188,7 @@ export class RdbEventStore implements EventStore {
       location: resultSet.getString(resultSet.getColumnIndex('location')),
       description: resultSet.getString(resultSet.getColumnIndex('description')),
       reporter: resultSet.getString(resultSet.getColumnIndex('reporter')),
+      reporterId: reporterIdValue === '' ? undefined : reporterIdValue,
       reportTime: resultSet.getString(resultSet.getColumnIndex('reportTime')),
       status: resultSet.getString(resultSet.getColumnIndex('status')) as EventStatus,
       priority: resultSet.getString(resultSet.getColumnIndex('priority')) as EventPriority,

@@ -10,6 +10,9 @@ import { Task, TaskStatus } from '../model/Task';
 import { EventSimulator } from '../simulator/EventSimulator';
 import { EventRepository } from '../repository/EventRepository';
 import { EventService } from './EventService';
+import { AccountService } from './AccountService';
+import { AppPermission, PermissionService } from './PermissionService';
+import { User } from '../model/User';
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
@@ -70,6 +73,10 @@ export class EventWorkflowService {
    * @returns 落库后的 SecurityEvent（status 为 PENDING，等待确认）；必填项缺失时返回 undefined
    */
   static reportHazard(input: HazardReport): SecurityEvent | undefined {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (!PermissionService.can(currentUser, AppPermission.REPORT_HAZARD)) {
+      return undefined;
+    }
     if (input.title === undefined || input.title.trim() === '' ||
       input.location === undefined || input.location.trim() === '' ||
       input.description === undefined || input.description.trim() === '') {
@@ -87,7 +94,8 @@ export class EventWorkflowService {
       type: input.type,
       location: input.location.trim(),
       description: input.description.trim(),
-      reporter: input.reporter === undefined || input.reporter.trim() === '' ? '学生上报' : input.reporter.trim(),
+      reporter: currentUser === null ? '本地用户' : currentUser.name,
+      reporterId: currentUser === null ? undefined : currentUser.id,
       reportTime: EventSimulator.formatReportTime(now),
       status: EventStatus.PENDING,
       priority: input.priority === undefined ? EventPriority.MEDIUM : input.priority
