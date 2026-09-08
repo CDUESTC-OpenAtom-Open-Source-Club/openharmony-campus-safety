@@ -41,40 +41,45 @@ export class EventService {
     return EventService.selectedEventId;
   }
 
-  static confirmEvent(id: string): void {
+  static confirmEvent(id: string): boolean {
     const event = EventService.getEventById(id);
 
-    if (event !== undefined) {
-      event.status = EventStatus.CONFIRMED;
-      EventRepository.getInstance().updateEvent(event);
+    if (event === undefined || event.status !== EventStatus.PENDING) {
+      return false;
     }
+    event.status = EventStatus.CONFIRMED;
+    EventRepository.getInstance().updateEvent(event);
+    return true;
   }
 
-  static createTaskFromEvent(id: string): void {
+  static createTaskFromEvent(id: string, assignee: string = 'inspector_001'): boolean {
     const event = EventService.getEventById(id);
 
-    if (event === undefined) {
-      return;
+    if (event === undefined || event.status !== EventStatus.CONFIRMED || assignee.trim() === '') {
+      return false;
     }
 
     const existingTask = EventRepository.getInstance().getTaskByEventId(id);
 
     if (existingTask !== undefined) {
-      return;
+      return false;
     }
 
     const newTask: Task = {
-      id: 'TASK' + (EventRepository.getInstance().getAllTasks().length + 1).toString().padStart(3, '0'),
+      id: 'TASK-' + event.id,
       eventId: event.id,
       title: event.title,
       location: event.location,
       description: event.description,
-      assignee: 'inspector_001',
+      assignee: assignee.trim(),
       createTime: event.reportTime,
       status: TaskStatus.PENDING
     };
 
     EventRepository.getInstance().saveTask(newTask);
+    event.handler = newTask.assignee;
+    EventRepository.getInstance().updateEvent(event);
+    return true;
   }
 
   static getAllTasks(): Task[] {
@@ -84,57 +89,87 @@ export class EventService {
     return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
   }
 
-  static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): void {
+  static updateTaskStatus(taskId: string, status: TaskStatus, result?: string): boolean {
+    if (status === TaskStatus.PROCESSING) {
+      return EventService.startTask(taskId);
+    }
+    if (status === TaskStatus.REVIEW || status === TaskStatus.COMPLETED) {
+      return EventService.submitTaskForReview(taskId, result === undefined ? '' : result);
+    }
+    return false;
+  }
+
+  static startTask(taskId: string): boolean {
     const repository = EventRepository.getInstance();
-
-    const task = repository.getAllTasks().find(
-      (t: Task) => t.id === taskId
-    );
-
-    if (task === undefined) {
-      return;
+    const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
+    if (task === undefined || task.status !== TaskStatus.PENDING) {
+      return false;
     }
-
-    // 已完成任务不允许回退
-    if (task.status === TaskStatus.COMPLETED &&
-      status !== TaskStatus.COMPLETED) {
-      return;
-    }
-
-    // 更新任务状态
-    task.status = status;
-
-    // 如果传入了处理结果，就保存处理结果
-    if (result !== undefined) {
-      task.result = result;
-    }
-
-    // 如果任务完成，记录完成时间
-    if (status === TaskStatus.COMPLETED) {
-      task.completedTime = EventService.getCurrentTime();
-    }
-
-    // 保存任务
+    task.status = TaskStatus.PROCESSING;
     repository.saveTask(task);
-
-    // 状态联动：任务完成后，对应安全事件也完成
-    const event = repository.getEventById(task.eventId);
-
-    if (event !== undefined) {
-      if (status === TaskStatus.COMPLETED) {
-        event.status = EventStatus.COMPLETED;
-        repository.updateEvent(event);
-      } else if (status === TaskStatus.PROCESSING) {
-
-        // 仅向前推进
-        if (event.status === EventStatus.PENDING ||
-          event.status === EventStatus.CONFIRMED) {
-
-          event.status = EventStatus.PROCESSING;
-          repository.updateEvent(event);
-        }
-      }
+    const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
+    if (event !== undefined &&
+      (event.status === EventStatus.CONFIRMED || event.status === EventStatus.PENDING)) {
+      event.status = EventStatus.PROCESSING;
+      repository.updateEvent(event);
     }
+    return true;
+  }
+
+  static submitTaskForReview(taskId: string, result: string): boolean {
+    const repository = EventRepository.getInstance();
+    const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
+    const trimmedResult: string = result.trim();
+    if (task === undefined || task.status !== TaskStatus.PROCESSING || trimmedResult === '') {
+      return false;
+    }
+    task.status = TaskStatus.REVIEW;
+    task.result = trimmedResult;
+    task.submittedTime = EventService.getCurrentTime();
+    task.rejectionReason = undefined;
+    repository.saveTask(task);
+    const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
+    if (event !== undefined && event.status === EventStatus.PROCESSING) {
+      event.status = EventStatus.REVIEW;
+      repository.updateEvent(event);
+    }
+    return true;
+  }
+
+  static approveTask(taskId: string): boolean {
+    const repository = EventRepository.getInstance();
+    const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
+    if (task === undefined || task.status !== TaskStatus.REVIEW) {
+      return false;
+    }
+    task.status = TaskStatus.COMPLETED;
+    task.completedTime = EventService.getCurrentTime();
+    repository.saveTask(task);
+    const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
+    if (event !== undefined && event.status === EventStatus.REVIEW) {
+      event.status = EventStatus.COMPLETED;
+      repository.updateEvent(event);
+    }
+    return true;
+  }
+
+  static rejectTask(taskId: string, reason: string): boolean {
+    const repository = EventRepository.getInstance();
+    const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
+    const trimmedReason: string = reason.trim();
+    if (task === undefined || task.status !== TaskStatus.REVIEW || trimmedReason === '') {
+      return false;
+    }
+    task.status = TaskStatus.PROCESSING;
+    task.rejectionReason = trimmedReason;
+    task.completedTime = undefined;
+    repository.saveTask(task);
+    const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
+    if (event !== undefined && event.status === EventStatus.REVIEW) {
+      event.status = EventStatus.PROCESSING;
+      repository.updateEvent(event);
+    }
+    return true;
   }
 
   private static getCurrentTime(): string {

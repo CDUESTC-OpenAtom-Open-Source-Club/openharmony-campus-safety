@@ -206,7 +206,8 @@ export default function stabilityTest() {
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '批量回归处置完成');
+        EventService.approveTask(task.id);
       }
 
       expect(repo.getEvents().length).assertEqual(50);

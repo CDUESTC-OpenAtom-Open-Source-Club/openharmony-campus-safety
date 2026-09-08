@@ -11,7 +11,7 @@ import { Task, TaskStatus } from '../../model/Task';
 import { EventStore } from './EventStore';
 
 const DB_NAME: string = 'campus_safety.db';
-const DB_VERSION: number = 2;
+const DB_VERSION: number = 3;
 
 /**
  * relationalStore 存储实现（C 模块，真机/云手机用）。
@@ -47,7 +47,8 @@ export class RdbEventStore implements EventStore {
       'CREATE TABLE IF NOT EXISTS task (' +
       'id TEXT PRIMARY KEY, eventId TEXT NOT NULL, title TEXT NOT NULL, ' +
       'location TEXT NOT NULL, description TEXT NOT NULL, assignee TEXT NOT NULL, ' +
-      'createTime TEXT NOT NULL, status TEXT NOT NULL, result TEXT, completedTime TEXT)'
+      'createTime TEXT NOT NULL, status TEXT NOT NULL, result TEXT, completedTime TEXT, ' +
+      'submittedTime TEXT, rejectionReason TEXT)'
     );
 
     // v1 的 task 表没有处理结果和完成时间。按实际列状态执行幂等迁移，
@@ -58,6 +59,12 @@ export class RdbEventStore implements EventStore {
     }
     if (!taskColumns.includes('completedTime')) {
       await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN completedTime TEXT');
+    }
+    if (!taskColumns.includes('submittedTime')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN submittedTime TEXT');
+    }
+    if (!taskColumns.includes('rejectionReason')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN rejectionReason TEXT');
     }
     if (this.rdbStore.version < DB_VERSION) {
       this.rdbStore.version = DB_VERSION;
@@ -127,6 +134,8 @@ export class RdbEventStore implements EventStore {
   async saveTask(task: Task): Promise<void> {
     const result: string | null = task.result === undefined ? null : task.result;
     const completedTime: string | null = task.completedTime === undefined ? null : task.completedTime;
+    const submittedTime: string | null = task.submittedTime === undefined ? null : task.submittedTime;
+    const rejectionReason: string | null = task.rejectionReason === undefined ? null : task.rejectionReason;
     const values: ValuesBucket = {
       'id': task.id,
       'eventId': task.eventId,
@@ -137,7 +146,9 @@ export class RdbEventStore implements EventStore {
       'createTime': task.createTime,
       'status': task.status,
       'result': result,
-      'completedTime': completedTime
+      'completedTime': completedTime,
+      'submittedTime': submittedTime,
+      'rejectionReason': rejectionReason
     };
     await this.rdbStore.insert('task', values, relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
   }
@@ -179,6 +190,8 @@ export class RdbEventStore implements EventStore {
   private rowToTask(resultSet: relationalStore.ResultSet): Task {
     const resultValue: string = resultSet.getString(resultSet.getColumnIndex('result'));
     const completedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('completedTime'));
+    const submittedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('submittedTime'));
+    const rejectionReasonValue: string = resultSet.getString(resultSet.getColumnIndex('rejectionReason'));
     const task: Task = {
       id: resultSet.getString(resultSet.getColumnIndex('id')),
       eventId: resultSet.getString(resultSet.getColumnIndex('eventId')),
@@ -189,7 +202,9 @@ export class RdbEventStore implements EventStore {
       createTime: resultSet.getString(resultSet.getColumnIndex('createTime')),
       status: resultSet.getString(resultSet.getColumnIndex('status')) as TaskStatus,
       result: resultValue === '' ? undefined : resultValue,
-      completedTime: completedTimeValue === '' ? undefined : completedTimeValue
+      completedTime: completedTimeValue === '' ? undefined : completedTimeValue,
+      submittedTime: submittedTimeValue === '' ? undefined : submittedTimeValue,
+      rejectionReason: rejectionReasonValue === '' ? undefined : rejectionReasonValue
     };
     return task;
   }

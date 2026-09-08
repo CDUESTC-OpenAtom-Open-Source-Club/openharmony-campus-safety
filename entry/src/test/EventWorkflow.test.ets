@@ -80,14 +80,21 @@ export default function eventWorkflowTest() {
       }
     });
 
-    it('workflow_state_link_task_completed_updates_event', 0, () => {
+    it('workflow_submit_then_approve_updates_event', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
       EventService.createTaskFromEvent(event.id);
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.startTask(task.id);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        const reviewing = EventRepository.getInstance().getEventById(event.id);
+        expect(reviewing === undefined).assertFalse();
+        if (reviewing !== undefined) {
+          expect(reviewing.status).assertEqual(EventStatus.REVIEW);
+        }
+        EventService.approveTask(task.id);
         const stored = EventRepository.getInstance().getEventById(event.id);
         expect(stored === undefined).assertFalse();
         if (stored !== undefined) {
@@ -130,7 +137,13 @@ export default function eventWorkflowTest() {
       }
 
       if (task !== undefined) {
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        const pendingReview = repo.getEventById(event.id);
+        expect(pendingReview === undefined).assertFalse();
+        if (pendingReview !== undefined) {
+          expect(pendingReview.status).assertEqual(EventStatus.REVIEW);
+        }
+        EventService.approveTask(task.id);
         const afterComplete = repo.getEventById(event.id);
         expect(afterComplete === undefined).assertFalse();
         if (afterComplete !== undefined) {
@@ -147,7 +160,8 @@ export default function eventWorkflowTest() {
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        EventService.approveTask(task.id);
         // 已完成任务被要求回退到处理中：任务与事件状态均保持不变
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
         const storedTask = EventRepository.getInstance().getTaskByEventId(event.id);
@@ -160,6 +174,49 @@ export default function eventWorkflowTest() {
         if (storedEvent !== undefined) {
           expect(storedEvent.status).assertEqual(EventStatus.COMPLETED);
         }
+      }
+    });
+
+    it('workflow_review_rejection_returns_to_processing', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      EventService.confirmEvent(event.id);
+      EventService.createTaskFromEvent(event.id);
+      const repo = EventRepository.getInstance();
+      const task = repo.getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.submitTaskForReview(task.id, '已清理现场')).assertTrue();
+        expect(EventService.rejectTask(task.id, '缺少复测说明')).assertTrue();
+        const rejectedTask = repo.getTaskByEventId(event.id);
+        expect(rejectedTask === undefined).assertFalse();
+        if (rejectedTask !== undefined) {
+          expect(rejectedTask.status).assertEqual(TaskStatus.PROCESSING);
+          expect(rejectedTask.rejectionReason).assertEqual('缺少复测说明');
+        }
+        const rejectedEvent = repo.getEventById(event.id);
+        expect(rejectedEvent === undefined).assertFalse();
+        if (rejectedEvent !== undefined) {
+          expect(rejectedEvent.status).assertEqual(EventStatus.PROCESSING);
+        }
+      }
+    });
+
+    it('workflow_invalid_and_duplicate_transitions_are_rejected', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.createTaskFromEvent(event.id)).assertFalse();
+      expect(EventService.confirmEvent(event.id)).assertTrue();
+      expect(EventService.confirmEvent(event.id)).assertFalse();
+      expect(EventService.createTaskFromEvent(event.id)).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id)).assertFalse();
+      const task = EventRepository.getInstance().getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.submitTaskForReview(task.id, '尚未接单')).assertFalse();
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.startTask(task.id)).assertFalse();
+        expect(EventService.submitTaskForReview(task.id, '   ')).assertFalse();
+        expect(EventService.approveTask(task.id)).assertFalse();
       }
     });
 

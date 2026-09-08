@@ -137,7 +137,8 @@ export class EventWorkflowService {
     const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
     if (task !== undefined) {
       EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-      EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+      EventService.submitTaskForReview(task.id, '演示处置完成，现场复核正常');
+      EventService.approveTask(task.id);
     }
     return event;
   }

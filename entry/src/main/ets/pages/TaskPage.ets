@@ -20,11 +20,14 @@ export struct TaskPage {
   @State private filterTab: string = 'ALL';
   @State private processingTaskId: string = '';
   @State private resultText: string = '';
+  @State private reviewTaskId: string = '';
+  @State private rejectionReason: string = '';
 
   private filters: TaskFilter[] = [
     { id: 'ALL', label: '全部' },
     { id: '待处理', label: '待处理' },
     { id: '处理中', label: '处理中' },
+    { id: '待审核', label: '待审核' },
     { id: '已完成', label: '已完成' }
   ];
 
@@ -33,6 +36,8 @@ export struct TaskPage {
       return '#B45309';
     } else if (status === TaskStatus.PROCESSING) {
       return '#2563EB';
+    } else if (status === TaskStatus.REVIEW) {
+      return '#7C3AED';
     }
     return '#059669';
   }
@@ -42,6 +47,8 @@ export struct TaskPage {
       return '#FFF7ED';
     } else if (status === TaskStatus.PROCESSING) {
       return '#EFF6FF';
+    } else if (status === TaskStatus.REVIEW) {
+      return '#F5F3FF';
     }
     return '#ECFDF5';
   }
@@ -59,21 +66,17 @@ export struct TaskPage {
     this.tasks = EventService.getAllTasks().slice();
   }
 
-  private confirmComplete(task: Task): void {
+  private confirmSubmit(task: Task): void {
     if (this.resultText.trim() === '') {
       return;
     }
     AlertDialog.show({
-      title: '确认完成工单',
-      message: '确认将工单 ' + task.id + ' 标记为已完成吗？处置记录将自动同步至安全知识库。',
+      title: '提交处置审核',
+      message: '确认提交工单 ' + task.id + ' 的处置结果吗？提交后将等待管理员审核。',
       primaryButton: {
-        value: '确认完成',
+        value: '提交审核',
         action: () => {
-          EventService.updateTaskStatus(
-            task.id,
-            TaskStatus.COMPLETED,
-            this.resultText.trim()
-          );
+          EventService.submitTaskForReview(task.id, this.resultText.trim());
           this.processingTaskId = '';
           this.resultText = '';
           this.refreshTasks();
@@ -290,7 +293,7 @@ export struct TaskPage {
                         this.resultText = value;
                       })
 
-                    Button('提交处置结果并完成')
+                    Button('提交处置结果待审核')
                       .width('100%')
                       .height(42)
                       .borderRadius(12)
@@ -302,10 +305,89 @@ export struct TaskPage {
                         if (this.resultText.trim() === '') {
                           return;
                         }
-                        this.confirmComplete(task);
+                        this.confirmSubmit(task);
                       })
                   }
                   .width('100%')
+                }
+
+                if (task.status === TaskStatus.REVIEW) {
+                  Column({ space: 8 }) {
+                    Text('处置结果：' + (task.result ?? ''))
+                      .fontSize(11)
+                      .fontColor('#334155')
+                      .width('100%')
+                      .padding(10)
+                      .borderRadius(12)
+                      .backgroundColor('#F5F3FF')
+                      .border({ width: 1, color: '#DDD6FE' })
+
+                    TextInput({
+                      placeholder: '驳回时请输入返工原因...',
+                      text: this.reviewTaskId === task.id ? this.rejectionReason : ''
+                    })
+                      .width('100%')
+                      .height(42)
+                      .fontSize(12)
+                      .borderRadius(12)
+                      .backgroundColor('#F8FAFC')
+                      .border({ width: 1, color: '#CBD5E1' })
+                      .padding({ left: 10, right: 10 })
+                      .onFocus(() => {
+                        this.reviewTaskId = task.id;
+                      })
+                      .onChange((value: string) => {
+                        this.reviewTaskId = task.id;
+                        this.rejectionReason = value;
+                      })
+
+                    Row({ space: 8 }) {
+                      Button('驳回返工')
+                        .layoutWeight(1)
+                        .height(42)
+                        .borderRadius(12)
+                        .backgroundColor('#DC2626')
+                        .fontColor(Color.White)
+                        .fontSize(12)
+                        .onClick(() => {
+                          if (this.rejectionReason.trim() !== '' &&
+                            EventService.rejectTask(task.id, this.rejectionReason)) {
+                            this.reviewTaskId = '';
+                            this.rejectionReason = '';
+                            this.refreshTasks();
+                          }
+                        })
+
+                      Button('审核通过')
+                        .layoutWeight(1)
+                        .height(42)
+                        .borderRadius(12)
+                        .backgroundColor('#059669')
+                        .fontColor(Color.White)
+                        .fontSize(12)
+                        .onClick(() => {
+                          if (EventService.approveTask(task.id)) {
+                            this.reviewTaskId = '';
+                            this.rejectionReason = '';
+                            this.refreshTasks();
+                          }
+                        })
+                    }
+                    .width('100%')
+                  }
+                  .width('100%')
+                }
+
+                if (task.status === TaskStatus.PROCESSING && task.rejectionReason !== undefined) {
+                  Text('返工原因：' + task.rejectionReason)
+                    .fontSize(11)
+                    .fontColor('#B91C1C')
+                    .width('100%')
+                    .padding(10)
+                    .borderRadius(12)
+                    .backgroundColor('#FEF2F2')
+                    .border({ width: 1, color: '#FECACA' })
+                    .margin({ top: 8 })
                 }
 
                 if (task.status === TaskStatus.COMPLETED) {
