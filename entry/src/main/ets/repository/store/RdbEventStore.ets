@@ -11,6 +11,7 @@ import { Task, TaskStatus } from '../../model/Task';
 import { EventStore } from './EventStore';
 
 const DB_NAME: string = 'campus_safety.db';
+const DB_VERSION: number = 2;
 
 /**
  * relationalStore 存储实现（C 模块，真机/云手机用）。
@@ -46,8 +47,35 @@ export class RdbEventStore implements EventStore {
       'CREATE TABLE IF NOT EXISTS task (' +
       'id TEXT PRIMARY KEY, eventId TEXT NOT NULL, title TEXT NOT NULL, ' +
       'location TEXT NOT NULL, description TEXT NOT NULL, assignee TEXT NOT NULL, ' +
-      'createTime TEXT NOT NULL, status TEXT NOT NULL)'
+      'createTime TEXT NOT NULL, status TEXT NOT NULL, result TEXT, completedTime TEXT)'
     );
+
+    // v1 的 task 表没有处理结果和完成时间。按实际列状态执行幂等迁移，
+    // 兼容已发布旧库，也能安全恢复上次启动时被中断的部分迁移。
+    const taskColumns: string[] = await this.getTaskColumns();
+    if (!taskColumns.includes('result')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN result TEXT');
+    }
+    if (!taskColumns.includes('completedTime')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN completedTime TEXT');
+    }
+    if (this.rdbStore.version < DB_VERSION) {
+      this.rdbStore.version = DB_VERSION;
+    }
+  }
+
+  private async getTaskColumns(): Promise<string[]> {
+    const resultSet: relationalStore.ResultSet = await this.rdbStore.querySql('PRAGMA table_info(task)');
+    const columns: string[] = [];
+    try {
+      const nameColumnIndex: number = resultSet.getColumnIndex('name');
+      while (resultSet.goToNextRow()) {
+        columns.push(resultSet.getString(nameColumnIndex));
+      }
+    } finally {
+      resultSet.close();
+    }
+    return columns;
   }
 
   async loadEvents(): Promise<SecurityEvent[]> {
@@ -97,6 +125,8 @@ export class RdbEventStore implements EventStore {
   }
 
   async saveTask(task: Task): Promise<void> {
+    const result: string | null = task.result === undefined ? null : task.result;
+    const completedTime: string | null = task.completedTime === undefined ? null : task.completedTime;
     const values: ValuesBucket = {
       'id': task.id,
       'eventId': task.eventId,
@@ -105,7 +135,9 @@ export class RdbEventStore implements EventStore {
       'description': task.description,
       'assignee': task.assignee,
       'createTime': task.createTime,
-      'status': task.status
+      'status': task.status,
+      'result': result,
+      'completedTime': completedTime
     };
     await this.rdbStore.insert('task', values, relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
   }
@@ -145,6 +177,8 @@ export class RdbEventStore implements EventStore {
   }
 
   private rowToTask(resultSet: relationalStore.ResultSet): Task {
+    const resultValue: string = resultSet.getString(resultSet.getColumnIndex('result'));
+    const completedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('completedTime'));
     const task: Task = {
       id: resultSet.getString(resultSet.getColumnIndex('id')),
       eventId: resultSet.getString(resultSet.getColumnIndex('eventId')),
@@ -153,7 +187,9 @@ export class RdbEventStore implements EventStore {
       description: resultSet.getString(resultSet.getColumnIndex('description')),
       assignee: resultSet.getString(resultSet.getColumnIndex('assignee')),
       createTime: resultSet.getString(resultSet.getColumnIndex('createTime')),
-      status: resultSet.getString(resultSet.getColumnIndex('status')) as TaskStatus
+      status: resultSet.getString(resultSet.getColumnIndex('status')) as TaskStatus,
+      result: resultValue === '' ? undefined : resultValue,
+      completedTime: completedTimeValue === '' ? undefined : completedTimeValue
     };
     return task;
   }

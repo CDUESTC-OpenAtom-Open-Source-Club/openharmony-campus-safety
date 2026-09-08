@@ -76,6 +76,25 @@ export default function eventRepositoryTest() {
       expect(tasks[0].eventId).assertEqual('E1');
     });
 
+    it('completed_task_result_survives_repository_reload', 0, async () => {
+      const store = new MemoryEventStore();
+      const firstRepository = EventRepository.initForTest(store);
+      const completedTask: Task = buildTask('TASK001', 'E1');
+      completedTask.status = TaskStatus.COMPLETED;
+      completedTask.result = '已更换损坏的应急灯并复测正常';
+      completedTask.completedTime = '2026-09-08 14:30:00';
+      firstRepository.saveTask(completedTask);
+
+      // 重新创建 Repository 并从同一持久化后端加载，模拟应用重启。
+      const reloadedRepository = EventRepository.initForTest(store);
+      await reloadedRepository.load();
+      const tasks: Task[] = reloadedRepository.getAllTasks();
+      expect(tasks.length).assertEqual(1);
+      expect(tasks[0].status).assertEqual(TaskStatus.COMPLETED);
+      expect(tasks[0].result).assertEqual('已更换损坏的应急灯并复测正常');
+      expect(tasks[0].completedTime).assertEqual('2026-09-08 14:30:00');
+    });
+
     it('repository_save_event_then_get', 0, () => {
       const repo = EventRepository.getInstance();
       repo.saveEvent(buildEvent('EVT100'));
