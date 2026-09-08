@@ -1,5 +1,7 @@
 # C 模块整体计划
 
+> **历史计划。** 自 2026-09-08 起已由《正式测试版专业化迭代计划》取代，A/B/C 固定模块边界不再生效。
+
 > 生成日期：2026-08-26
 > 分支基线：main（当前 feature/C-event-simulator）
 > 适用文档：C_MODULE_SPEC.md / MODULE_BOUNDARIES.md / TECH_STACK.md / TESTING.md / WORKFLOW.md / CLAUDE.md
