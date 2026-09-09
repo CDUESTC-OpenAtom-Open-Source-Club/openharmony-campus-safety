@@ -587,13 +587,13 @@ struct Index {
     });
 
     this.timerProgress1 = setTimeout(() => {
-      this.splashStepText = '连接校园物联网感知网格...';
+      this.splashStepText = '正在加载本地安全数据...';
     }, 400);
     this.timerProgress2 = setTimeout(() => {
-      this.splashStepText = '正在校验安防巡检节点...';
+      this.splashStepText = '正在准备协同处置工作台...';
     }, 900);
     this.timerProgress3 = setTimeout(() => {
-      this.splashStepText = '鸿蒙智安守护网络已就绪';
+      this.splashStepText = '鸿蒙智安已就绪';
     }, 1450);
 
     this.timerExit = setTimeout(() => {
@@ -879,7 +879,7 @@ struct Index {
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#64748B')
                 Blank()
-                Text('协同闭环率 100%')
+                Text('本地数据实时汇总')
                   .fontSize(11)
                   .fontWeight(FontWeight.Medium)
                   .fontColor('#2563EB')

@@ -9,6 +9,7 @@ import {
   TaskStatus
 } from '../model/Task';
 import { EventService } from '../service/EventService';
+import { SafetyStatisticsService, SafetyStatisticsSnapshot } from '../service/SafetyStatisticsService';
 
 interface BarItem {
   day: string;
@@ -38,7 +39,14 @@ export struct StatisticsPage {
     ).length;
   }
 
-  private getHealthScore(): number {
+  private getStatistics(): SafetyStatisticsSnapshot {
+    return SafetyStatisticsService.createSnapshot(this.events, this.tasks);
+  }
+
+  private getHealthScore(): number | null {
+    if (this.events.length === 0 && this.tasks.length === 0) {
+      return null;
+    }
     let penalty: number = 0;
     this.events.forEach((event: SecurityEvent) => {
       if (
@@ -65,11 +73,14 @@ export struct StatisticsPage {
         penalty += 3;
       }
     });
-    const score: number = Math.max(55, Math.min(100, 100 - penalty));
+    const score: number = Math.max(0, Math.min(100, 100 - penalty));
     return Math.round(score * 10) / 10;
   }
 
-  private getHealthGrade(score: number): string {
+  private getHealthGrade(score: number | null): string {
+    if (score === null) {
+      return '暂无数据';
+    }
     if (score >= 95) {
       return 'A+';
     } else if (score >= 90) {
@@ -82,55 +93,31 @@ export struct StatisticsPage {
     return 'D';
   }
 
-  private parseTime(value: string): number {
-    const datePart: string = value.split(' ')[0];
-    const timePart: string = value.split(' ').length > 1 ? value.split(' ')[1] : '';
-    const d: string[] = datePart.split('-');
-    const t: string[] = timePart === '' ? ['0', '0', '0'] : timePart.split(':');
-    const year: number = Number(d[0]);
-    const month: number = Number(d[1]) - 1;
-    const day: number = Number(d[2]);
-    const hour: number = t.length > 0 ? Number(t[0]) : 0;
-    const minute: number = t.length > 1 ? Number(t[1]) : 0;
-    const second: number = t.length > 2 ? Number(t[2]) : 0;
-    return new Date(year, month, day, hour, minute, second).getTime();
+  private getHealthScoreText(): string {
+    const score: number | null = this.getHealthScore();
+    return score === null ? '—' : score.toString();
   }
 
   private getAverageResponse(): string {
-    let totalMinutes: number = 0;
-    let count: number = 0;
-    this.tasks.forEach((task: Task) => {
-      if (
-        task.status === TaskStatus.COMPLETED &&
-        task.createTime !== '' &&
-        task.completedTime !== undefined &&
-        task.completedTime !== ''
-      ) {
-        const start: number = this.parseTime(task.createTime);
-        const end: number = this.parseTime(task.completedTime);
-        if (start > 0 && end > start) {
-          totalMinutes += Math.round((end - start) / 60000);
-          count++;
-        }
-      }
-    });
-    if (count === 0) {
-      return '暂无处置记录';
-    }
-    return Math.round(totalMinutes / count).toString() + ' 分钟';
+    return SafetyStatisticsService.formatMinutes(this.getStatistics().averageFirstResponseMinutes);
+  }
+
+  private getAverageHandling(): string {
+    return SafetyStatisticsService.formatMinutes(this.getStatistics().averageHandlingMinutes);
+  }
+
+  private getOnTimeRate(): string {
+    const rate: number | null = this.getStatistics().onTimeCompletionRate;
+    return rate === null ? '不适用' : rate.toString() + '%';
   }
 
   private getDomainRate(type: EventType): number {
-    const domainEvents: SecurityEvent[] = this.events.filter(
-      (event: SecurityEvent) => event.type === type
-    );
-    if (domainEvents.length === 0) {
-      return 100;
-    }
-    const closed: number = domainEvents.filter(
-      (event: SecurityEvent) => event.status === EventStatus.COMPLETED
-    ).length;
-    return Math.round(closed / domainEvents.length * 100);
+    return SafetyStatisticsService.getTypeCompletionRate(this.events, type) ?? 0;
+  }
+
+  private getDomainRateLabel(type: EventType): string {
+    const rate: number | null = SafetyStatisticsService.getTypeCompletionRate(this.events, type);
+    return rate === null ? '暂无数据' : rate.toString() + '%';
   }
 
   private isSameDay(reportTime: string, date: Date): boolean {
@@ -242,7 +229,7 @@ export struct StatisticsPage {
               Blank()
 
               Column() {
-                Text(this.getHealthScore().toString())
+                Text(this.getHealthScoreText())
                   .fontSize(14)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#6EE7B7')
@@ -256,7 +243,7 @@ export struct StatisticsPage {
             .width('100%')
             .margin({ bottom: 10 })
 
-            Text('平均响应：' + this.getAverageResponse())
+            Text('平均首次响应：' + this.getAverageResponse())
               .fontSize(11)
               .fontColor('rgba(255,255,255,0.65)')
               .width('100%')
@@ -270,18 +257,18 @@ export struct StatisticsPage {
           })
           .shadow({ radius: 16, color: 'rgba(15,23,42,0.25)', offsetY: 6 })
 
-          // 三项实时指标
+          // 真实状态指标
           Row({ space: 8 }) {
             Column() {
-              Text('安全事件')
+              Text('待确认')
                 .fontSize(10)
                 .fontColor('#94A3B8')
-              Text(this.events.length.toString())
+              Text(this.getStatistics().pendingEvents.toString())
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#2563EB')
                 .margin({ top: 4 })
-              Text('全量汇聚')
+              Text('需确认')
                 .fontSize(9)
                 .fontColor('#94A3B8')
                 .margin({ top: 2 })
@@ -293,15 +280,15 @@ export struct StatisticsPage {
             .border({ width: 1, color: '#E2E8F0' })
 
             Column() {
-              Text('待办任务')
+              Text('处理中')
                 .fontSize(10)
                 .fontColor('#94A3B8')
-              Text(this.getPendingTaskCount().toString())
+              Text(this.getStatistics().processingEvents.toString())
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#D97706')
                 .margin({ top: 4 })
-              Text('处置中')
+              Text('事件')
                 .fontSize(9)
                 .fontColor('#94A3B8')
                 .margin({ top: 2 })
@@ -313,15 +300,15 @@ export struct StatisticsPage {
             .border({ width: 1, color: '#E2E8F0' })
 
             Column() {
-              Text('已办结')
+              Text('待审核')
                 .fontSize(10)
                 .fontColor('#94A3B8')
-              Text(this.getCompletedTaskCount().toString())
+              Text(this.getStatistics().reviewEvents.toString())
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#059669')
                 .margin({ top: 4 })
-              Text('归档闭环')
+              Text('事件')
                 .fontSize(9)
                 .fontColor('#94A3B8')
                 .margin({ top: 2 })
@@ -333,6 +320,26 @@ export struct StatisticsPage {
             .border({ width: 1, color: '#E2E8F0' })
           }
           .width('100%')
+
+          Column({ space: 8 }) {
+            Text('处置效率')
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#334155')
+              .width('100%')
+            Row({ space: 8 }) {
+              this.metricItem('已完成', this.getStatistics().completedEvents.toString())
+              this.metricItem('超时任务', this.getStatistics().overdueTasks.toString())
+              this.metricItem('平均处置', this.getAverageHandling())
+              this.metricItem('按期完成', this.getOnTimeRate())
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding(14)
+          .borderRadius(18)
+          .backgroundColor(Color.White)
+          .border({ width: 1, color: '#E2E8F0' })
 
           // 各领域达标率（按真实事件闭环率计算）
           Column({ space: 12 }) {
@@ -354,7 +361,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text(this.getDomainRate(EventType.FIRE).toString() + '%')
+                Text(this.getDomainRateLabel(EventType.FIRE))
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -381,7 +388,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text(this.getDomainRate(EventType.ELECTRIC).toString() + '%')
+                Text(this.getDomainRateLabel(EventType.ELECTRIC))
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -408,7 +415,7 @@ export struct StatisticsPage {
                   .fontSize(11)
                   .fontColor('#475569')
                   .layoutWeight(1)
-                Text(this.getDomainRate(EventType.FACILITY).toString() + '%')
+                Text(this.getDomainRateLabel(EventType.FACILITY))
                   .fontSize(11)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -507,5 +514,15 @@ export struct StatisticsPage {
     .onAppear(() => {
       this.pageReady = true;
     })
+  }
+
+  @Builder
+  private metricItem(label: string, value: string) {
+    Column({ space: 4 }) {
+      Text(label).fontSize(10).fontColor('#64748B')
+      Text(value).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#0F172A')
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
   }
 }
