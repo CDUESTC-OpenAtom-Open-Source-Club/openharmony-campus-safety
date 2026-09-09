@@ -1,130 +1,107 @@
 import { promptAction } from '@kit.ArkUI';
 import { AccountService, LoginResult } from '../service/AccountService';
+import { UserRole } from '../model/User';
 
 @Component
 export struct LoginPage {
   onLogin: () => void = (): void => {};
   @State private username: string = '';
   @State private password: string = '';
+  @State private displayName: string = '';
+  @State private registerMode: boolean = false;
+  @State private internalMode: boolean = false;
+  @State private invitationCode: string = '';
+  @State private role: UserRole = UserRole.STUDENT;
   @State private submitting: boolean = false;
 
-  private login(): void {
-    if (this.submitting || this.username.trim() === '' || this.password === '') {
-      return;
-    }
+  private submit(): void {
+    if (this.submitting) return;
     this.submitting = true;
-    AccountService.login(this.username, this.password).then((result: LoginResult) => {
+    let request: Promise<LoginResult>;
+    if (AccountService.needsAdministratorBootstrap()) {
+      request = AccountService.bootstrapAdministrator(this.username, this.displayName, this.password);
+    } else if (this.internalMode) {
+      request = AccountService.registerInternalUser(this.invitationCode, this.username, this.displayName, this.password);
+    } else if (this.registerMode) {
+      request = AccountService.registerUser(this.username, this.displayName, this.password, this.role);
+    } else {
+      request = AccountService.login(this.username, this.password);
+    }
+    request.then((result: LoginResult) => {
       this.submitting = false;
-      if (!result.success) {
-        promptAction.showToast({ message: result.message });
-        return;
+      promptAction.showToast({ message: result.message });
+      if (result.success && !this.registerMode && !this.internalMode) this.onLogin();
+      if (result.success && (this.registerMode || this.internalMode)) {
+        this.registerMode = false;
+        this.internalMode = false;
+        this.password = '';
+        this.invitationCode = '';
       }
-      this.onLogin();
-    }).catch((error: Error) => {
+    }).catch(() => {
       this.submitting = false;
-      console.error('Login failed: ' + error.message);
-      promptAction.showToast({ message: '登录失败，请稍后重试' });
+      promptAction.showToast({ message: '操作失败，请稍后重试' });
     });
+  }
+
+  private isBootstrap(): boolean {
+    return AccountService.needsAdministratorBootstrap();
+  }
+
+  private needsProfile(): boolean {
+    return this.isBootstrap() || this.registerMode || this.internalMode;
   }
 
   build() {
     Column() {
       Blank()
-
       Column({ space: 10 }) {
-        Row() {
-          Image($r('app.media.ic_shield'))
-            .width(44)
-            .height(44)
-            .fillColor(Color.White)
-        }
-        .width(86)
-        .height(86)
-        .borderRadius(26)
-        .linearGradient({
-          angle: 135,
-          colors: [['#2563EB', 0.0], ['#6366F1', 1.0]]
-        })
-        .justifyContent(FlexAlign.Center)
-        .shadow({ radius: 20, color: 'rgba(37,99,235,0.28)', offsetY: 8 })
-
-        Text('鸿蒙智安')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#0F172A')
-
-        Text('校园安全协同 · 正式测试版')
-          .fontSize(12)
-          .fontColor('#64748B')
-      }
-
+        Text('鸿蒙智安').fontSize(28).fontWeight(FontWeight.Bold).fontColor('#0F172A')
+        Text(this.isBootstrap() ? '首次安装：初始化管理员' :
+          (this.internalMode ? '内部身份开通' : (this.registerMode ? '注册普通用户' : '校园安全协同 · Beta')))
+          .fontSize(13).fontColor('#64748B')
+      }.alignItems(HorizontalAlign.Center)
       Column({ space: 14 }) {
-        TextInput({ placeholder: '请输入账号', text: this.username })
-          .height(50)
-          .fontSize(14)
-          .backgroundColor('#F8FAFC')
-          .border({ width: 1, color: '#CBD5E1' })
-          .borderRadius(14)
-          .padding({ left: 14, right: 14 })
-          .onChange((value: string) => {
-            this.username = value;
-          })
-
-        TextInput({ placeholder: '请输入密码', text: this.password })
-          .type(InputType.Password)
-          .height(50)
-          .fontSize(14)
-          .backgroundColor('#F8FAFC')
-          .border({ width: 1, color: '#CBD5E1' })
-          .borderRadius(14)
-          .padding({ left: 14, right: 14 })
-          .onChange((value: string) => {
-            this.password = value;
-          })
-          .onSubmit(() => {
-            this.login();
-          })
-
-        Button(this.submitting ? '正在登录...' : '登录')
-          .width('100%')
-          .height(50)
-          .borderRadius(14)
-          .backgroundColor('#2563EB')
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Bold)
-          .enabled(!this.submitting)
-          .onClick(() => {
-            this.login();
-          })
-
-        Text('测试账号：admin / inspector / student / teacher\n初始密码分别为 admin12345 / inspect123 / student123 / teacher123')
-          .fontSize(10)
-          .lineHeight(16)
-          .fontColor('#94A3B8')
-          .textAlign(TextAlign.Center)
-      }
-      .width('100%')
-      .padding(22)
-      .borderRadius(22)
-      .backgroundColor(Color.White)
-      .border({ width: 1, color: '#E2E8F0' })
-      .shadow({ radius: 16, color: 'rgba(15,23,42,0.06)', offsetY: 6 })
-      .margin({ top: 38 })
-
+        if (this.needsProfile()) {
+          TextInput({ placeholder: this.isBootstrap() ? '管理员姓名' : '姓名', text: this.displayName })
+            .onChange((value: string) => this.displayName = value)
+        }
+        TextInput({ placeholder: '账号（3—32 位字母、数字或下划线）', text: this.username })
+          .onChange((value: string) => this.username = value)
+        TextInput({ placeholder: '密码（至少 10 位，含字母和数字）', text: this.password })
+          .type(InputType.Password).onChange((value: string) => this.password = value)
+        if (this.internalMode && !this.isBootstrap()) {
+          TextInput({ placeholder: '内部邀请码（由管理员签发）', text: this.invitationCode })
+            .onChange((value: string) => this.invitationCode = value)
+        }
+        if (this.registerMode && !this.internalMode && !this.isBootstrap()) {
+          Row({ space: 8 }) {
+            Button('学生').backgroundColor(this.role === UserRole.STUDENT ? '#2563EB' : '#E2E8F0')
+              .fontColor(this.role === UserRole.STUDENT ? Color.White : '#334155').onClick(() => this.role = UserRole.STUDENT)
+            Button('教师').backgroundColor(this.role === UserRole.TEACHER ? '#2563EB' : '#E2E8F0')
+              .fontColor(this.role === UserRole.TEACHER ? Color.White : '#334155').onClick(() => this.role = UserRole.TEACHER)
+          }.width('100%')
+        }
+        Button(this.submitting ? '正在处理...' : (this.isBootstrap() ? '完成管理员初始化' :
+          (this.internalMode ? '验证邀请码并开通' : (this.registerMode ? '提交注册' : '登录'))))
+          .width('100%').height(50).backgroundColor('#2563EB').fontColor(Color.White).onClick(() => this.submit())
+        if (!this.isBootstrap() && !this.internalMode) {
+          Button(this.registerMode ? '返回登录' : '注册学生 / 教师账号')
+            .width('100%').backgroundColor('#EFF6FF').fontColor('#2563EB')
+            .onClick(() => { this.registerMode = !this.registerMode; this.internalMode = false; this.password = ''; })
+        }
+        if (!this.isBootstrap() && !this.registerMode) {
+          Text('内部人员开通 ›').fontSize(11).fontColor('#64748B').textAlign(TextAlign.Center)
+            .onClick(() => { this.internalMode = true; this.password = ''; })
+        }
+        if (this.internalMode) {
+          Text('返回登录').fontSize(12).fontColor('#2563EB').textAlign(TextAlign.Center)
+            .onClick(() => { this.internalMode = false; this.invitationCode = ''; this.password = ''; })
+        }
+        Text(this.isBootstrap() ? '管理员口令仅由首次设备持有人设置，应用不提供默认管理员账号。' :
+          '安保与管理员只可通过管理员签发的一次性限时邀请码开通；本地账号不替代校园统一身份认证。')
+          .fontSize(10).fontColor('#64748B').lineHeight(16).textAlign(TextAlign.Center)
+      }.width('100%').padding(22).borderRadius(22).backgroundColor(Color.White).margin({ top: 38 })
       Blank()
-
-      Text('本地账号仅用于应用内角色隔离，不等同于校园统一身份认证')
-        .fontSize(10)
-        .fontColor('#94A3B8')
-        .textAlign(TextAlign.Center)
-        .margin({ bottom: 28 })
-    }
-    .width('100%')
-    .height('100%')
-    .padding({ left: 22, right: 22 })
-    .linearGradient({
-      angle: 180,
-      colors: [['#EFF6FF', 0.0], ['#F8FAFC', 0.55], ['#EEF2FF', 1.0]]
-    })
+    }.width('100%').height('100%').padding(24).backgroundColor('#F8FAFC')
   }
 }

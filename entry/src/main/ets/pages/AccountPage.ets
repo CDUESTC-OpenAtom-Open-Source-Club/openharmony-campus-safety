@@ -1,6 +1,7 @@
 import { promptAction } from '@kit.ArkUI';
 import { User } from '../model/User';
-import { AccountService, LoginResult } from '../service/AccountService';
+import { AccountService, InvitationResult, LoginResult, ManagedAccount } from '../service/AccountService';
+import { UserRole } from '../model/User';
 import { AppPermission, PermissionService } from '../service/PermissionService';
 
 @Component
@@ -11,6 +12,7 @@ export struct AccountPage {
   @State private oldPassword: string = '';
   @State private newPassword: string = '';
   @State private confirmPassword: string = '';
+  @State private issuedInvitation: string = '';
 
   private getUser(): User | null {
     return AccountService.getCurrentUser();
@@ -28,6 +30,21 @@ export struct AccountPage {
         this.newPassword = '';
         this.confirmPassword = '';
       }
+    });
+  }
+
+  private issueInvitation(role: UserRole): void {
+    AccountService.issueInternalInvitation(role).then((result: InvitationResult) => {
+      promptAction.showToast({ message: result.message });
+      if (result.success) {
+        this.issuedInvitation = result.code ?? '';
+      }
+    });
+  }
+
+  private changeAccountStatus(item: ManagedAccount): void {
+    AccountService.setAccountActive(item.user.id, !item.active).then((result: LoginResult) => {
+      promptAction.showToast({ message: result.message });
     });
   }
 
@@ -64,7 +81,7 @@ export struct AccountPage {
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor('#0F172A')
-            Text((this.getUser()?.role ?? '') + ' · ' + (this.getUser()?.id ?? ''))
+            Text(this.getUser()?.role ?? '')
               .fontSize(12)
               .fontColor('#64748B')
           }
@@ -84,7 +101,7 @@ export struct AccountPage {
             TextInput({ placeholder: '原密码', text: this.oldPassword })
               .type(InputType.Password)
               .onChange((value: string) => this.oldPassword = value)
-            TextInput({ placeholder: '新密码（至少 8 位）', text: this.newPassword })
+            TextInput({ placeholder: '新密码（至少 10 位，含字母和数字）', text: this.newPassword })
               .type(InputType.Password)
               .onChange((value: string) => this.newPassword = value)
             TextInput({ placeholder: '再次输入新密码', text: this.confirmPassword })
@@ -104,22 +121,49 @@ export struct AccountPage {
 
           if (PermissionService.can(this.getUser(), AppPermission.MANAGE_ACCOUNTS)) {
             Column({ space: 10 }) {
-              Text('本机测试账号')
+              Text('账户治理')
                 .fontSize(15)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#0F172A')
                 .width('100%')
-              ForEach(AccountService.getUsers(), (user: User) => {
+              Text('公开注册只支持学生和教师。安保与管理员必须凭本机管理员签发的一次性限时邀请码开通。')
+                .fontSize(11).fontColor('#64748B').lineHeight(17).width('100%')
+              Row({ space: 8 }) {
+                Button('签发安保邀请码')
+                  .layoutWeight(1).fontSize(11).backgroundColor('#0F766E').fontColor(Color.White)
+                  .onClick(() => this.issueInvitation(UserRole.SECURITY))
+                Button('签发管理员邀请码')
+                  .layoutWeight(1).fontSize(11).backgroundColor('#7C3AED').fontColor(Color.White)
+                  .onClick(() => this.issueInvitation(UserRole.ADMIN))
+              }.width('100%')
+              if (this.issuedInvitation !== '') {
+                Column({ space: 5 }) {
+                  Text('刚签发的邀请码（仅显示一次）').fontSize(11).fontColor('#B45309').width('100%')
+                  Text(this.issuedInvitation).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#0F172A')
+                    .width('100%').textAlign(TextAlign.Center).padding(10).borderRadius(10).backgroundColor('#FFFBEB')
+                  Text('请通过受控校内渠道交付。离开此页面后无法再次查看原码。')
+                    .fontSize(10).fontColor('#92400E').lineHeight(15).width('100%')
+                }.width('100%').padding(10).borderRadius(12).backgroundColor('#FFFBEB')
+              }
+              Text('已开通账户').fontSize(12).fontWeight(FontWeight.Medium).fontColor('#334155').width('100%')
+              ForEach(AccountService.getManagedUsers(), (item: ManagedAccount) => {
                 Row() {
-                  Text(user.name).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#334155')
+                  Column({ space: 2 }) {
+                    Text(item.user.name).fontSize(13).fontWeight(FontWeight.Medium).fontColor('#334155')
+                    Text(item.active ? '正常' : '已停用').fontSize(10).fontColor(item.active ? '#059669' : '#B91C1C')
+                  }.alignItems(HorizontalAlign.Start)
                   Blank()
-                  Text(user.role).fontSize(11).fontColor('#2563EB')
+                  Text(item.user.role).fontSize(11).fontColor('#2563EB').margin({ right: 8 })
+                  Button(item.active ? '停用' : '启用').fontSize(10).height(28)
+                    .fontColor(item.active ? '#B91C1C' : '#047857')
+                    .backgroundColor(item.active ? '#FEF2F2' : '#ECFDF5')
+                    .onClick(() => this.changeAccountStatus(item))
                 }
                 .width('100%')
                 .padding({ top: 10, bottom: 10 })
                 .border({ width: { bottom: 1 }, color: '#F1F5F9' })
-              }, (user: User) => user.id)
-              Text('正式校园身份认证仍需可信服务端支持；当前账号仅用于本机测试版协同。')
+              }, (item: ManagedAccount) => item.user.id)
+              Text('当前版本使用本机加盐口令摘要与角色隔离。正式校园部署仍须接入可信身份服务、服务端授权和集中审计。')
                 .fontSize(10)
                 .fontColor('#94A3B8')
                 .lineHeight(16)
