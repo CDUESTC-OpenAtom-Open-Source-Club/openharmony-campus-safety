@@ -4,6 +4,8 @@ import {
 } from '../model/SecurityEvent';
 import { EventWorkflowService } from '../service/EventWorkflowService';
 import { promptAction } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { AttachmentService } from '../service/AttachmentService';
 
 interface TypeCard {
   type: EventType;
@@ -16,6 +18,7 @@ interface TypeCard {
 @Component
 export struct ReportPage {
   pageStack: NavPathStack = new NavPathStack();
+  onReported: () => void = () => {};
 
   @State private pageReady: boolean = false;
   @State private selectedTypeIndex: number = 0;
@@ -23,7 +26,21 @@ export struct ReportPage {
   @State private location: string = '';
   @State private description: string = '';
   @State private reporter: string = '';
-  @State private hasPhoto: boolean = false;
+  @State private attachmentPaths: string[] = [];
+
+  private selectPhotos(): void {
+    const context: common.Context = getContext(this) as common.Context;
+    AttachmentService.selectEvidence(context).then((paths: string[]) => {
+      if (paths.length === 0) {
+        promptAction.showToast({ message: '未选择照片或照片超过 10 MB' });
+        return;
+      }
+      this.attachmentPaths.forEach((path: string) => AttachmentService.remove(path));
+      this.attachmentPaths = paths;
+    }).catch((error: Error) => {
+      promptAction.showToast({ message: '照片选择失败：' + error.message });
+    });
+  }
 
   private typeCards: TypeCard[] = [
     { type: EventType.FIRE, label: '消防隐患', icon: '▲', color: '#DC2626', bg: '#FEF2F2' },
@@ -59,16 +76,18 @@ export struct ReportPage {
       location: this.location,
       description: this.description,
       reporter: this.reporter,
-      priority: this.priorityValues[this.selectedPriorityIndex]
+      priority: this.priorityValues[this.selectedPriorityIndex],
+      attachmentPaths: this.attachmentPaths
     });
     if (result === undefined) {
       promptAction.showToast({ message: '请填写发生地点和隐患描述' });
     } else {
       promptAction.showToast({ message: '上报成功！编号：' + result.id });
+      this.onReported();
       this.location = '';
       this.description = '';
       this.reporter = '';
-      this.hasPhoto = false;
+      this.attachmentPaths = [];
     }
   }
 
@@ -281,28 +300,42 @@ export struct ReportPage {
                 .fontColor('#334155')
                 .width('100%')
 
-              if (this.hasPhoto) {
-                Row() {
-                  Text('✓ 已添加照片')
+              if (this.attachmentPaths.length > 0) {
+                Column({ space: 8 }) {
+                  ForEach(this.attachmentPaths, (path: string) => {
+                    Row({ space: 10 }) {
+                      Image('file://' + path)
+                        .width(58)
+                        .height(58)
+                        .borderRadius(10)
+                        .objectFit(ImageFit.Cover)
+                      Text('已保存到应用私有目录')
+                        .fontSize(11)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor('#2563EB')
+                        .layoutWeight(1)
+                      Text('移除')
+                        .fontSize(10)
+                        .fontColor('#DC2626')
+                        .onClick(() => {
+                          AttachmentService.remove(path);
+                          this.attachmentPaths = this.attachmentPaths.filter((item: string) => item !== path);
+                        })
+                    }
+                    .width('100%')
+                  }, (path: string) => path)
+                  Text('重新选择')
                     .fontSize(11)
-                    .fontWeight(FontWeight.Bold)
                     .fontColor('#2563EB')
-                  Text('移除')
-                    .fontSize(10)
-                    .fontColor('#DC2626')
-                    .margin({ left: 10 })
-                    .onClick(() => {
-                      this.hasPhoto = false;
-                    })
+                    .onClick(() => this.selectPhotos())
                 }
                 .width('100%')
-                .height(64)
+                .padding(10)
                 .borderRadius(14)
                 .backgroundColor('#EFF6FF')
                 .border({ width: 1, color: '#BFDBFE' })
-                .justifyContent(FlexAlign.Center)
               } else {
-                Text('点击模拟拍摄或上传照片')
+                Text('点击从系统相册选择照片（最多 3 张）')
                   .fontSize(11)
                   .fontWeight(FontWeight.Medium)
                   .fontColor('#64748B')
@@ -313,8 +346,7 @@ export struct ReportPage {
                   .borderStyle(BorderStyle.Dashed)
                   .textAlign(TextAlign.Center)
                   .onClick(() => {
-                    this.hasPhoto = true;
-                    promptAction.showToast({ message: '已模拟获取现场拍摄照片' });
+                    this.selectPhotos();
                   })
               }
             }

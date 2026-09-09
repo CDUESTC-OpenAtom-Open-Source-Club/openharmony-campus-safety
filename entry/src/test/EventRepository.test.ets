@@ -98,6 +98,34 @@ export default function eventRepositoryTest() {
       expect(tasks[0].completedTime).assertEqual('2026-09-08 14:30:00');
     });
 
+    it('event_evidence_and_history_survive_repository_reload', 0, async () => {
+      const store = new MemoryEventStore();
+      const firstRepository = EventRepository.initForTest(store);
+      const event: SecurityEvent = buildEvent('EVIDENCE001');
+      event.attachmentPaths = ['/data/storage/el2/base/files/evidence/site.jpg'];
+      event.history = [{
+        id: 'AUDIT-1',
+        eventId: event.id,
+        operatorId: TEST_ADMIN.id,
+        operatorName: TEST_ADMIN.name,
+        action: '确认事件',
+        operationTime: '2026-09-09 09:00:00',
+        fromStatus: EventStatus.PENDING,
+        toStatus: EventStatus.CONFIRMED
+      }];
+      firstRepository.saveEvent(event);
+
+      const reloadedRepository = EventRepository.initForTest(store);
+      await reloadedRepository.load();
+      const reloaded: SecurityEvent | undefined = reloadedRepository.getEventById(event.id);
+      expect(reloaded === undefined).assertFalse();
+      if (reloaded !== undefined) {
+        expect((reloaded.attachmentPaths ?? []).length).assertEqual(1);
+        expect((reloaded.history ?? []).length).assertEqual(1);
+        expect((reloaded.history ?? [])[0].action).assertEqual('确认事件');
+      }
+    });
+
     it('repository_save_event_then_get', 0, () => {
       const repo = EventRepository.getInstance();
       repo.saveEvent(buildEvent('EVT100'));

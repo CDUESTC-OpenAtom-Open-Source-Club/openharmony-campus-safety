@@ -268,7 +268,49 @@ export default function eventWorkflowTest() {
         expect(event.location).assertEqual('教学楼2层东侧');
         expect(event.reporter).assertEqual(TEST_STUDENT.name);
         expect(event.reporterId).assertEqual(TEST_STUDENT.id);
+        expect((event.history ?? []).length).assertEqual(1);
+        expect((event.history ?? [])[0].action).assertEqual('提交隐患上报');
+        expect((event.history ?? [])[0].operatorId).assertEqual(TEST_STUDENT.id);
         expect(repo.getEventById(event.id) === undefined).assertFalse();
+      }
+    });
+
+    it('workflow_report_hazard_keeps_attachment_paths', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
+      const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '现场图片上报',
+        type: EventType.FACILITY,
+        location: '实验楼一层',
+        description: '配电箱外壳破损',
+        attachmentPaths: ['/data/storage/el2/base/files/evidence/evidence_1.jpg']
+      });
+      expect(event === undefined).assertFalse();
+      if (event !== undefined) {
+        expect((event.attachmentPaths ?? []).length).assertEqual(1);
+        expect((event.attachmentPaths ?? [])[0]).assertEqual(
+          '/data/storage/el2/base/files/evidence/evidence_1.jpg'
+        );
+      }
+    });
+
+    it('workflow_full_loop_records_audit_history', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.confirmEvent(event.id)).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id)).assertTrue();
+      const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.submitTaskForReview(task.id, '已完成处置')).assertTrue();
+        expect(EventService.approveTask(task.id)).assertTrue();
+      }
+      const stored: SecurityEvent | undefined = EventRepository.getInstance().getEventById(event.id);
+      expect(stored === undefined).assertFalse();
+      if (stored !== undefined) {
+        expect((stored.history ?? []).length).assertEqual(5);
+        expect((stored.history ?? [])[0].action).assertEqual('确认事件');
+        expect((stored.history ?? [])[4].action).assertEqual('审核通过');
+        expect((stored.history ?? [])[4].toStatus).assertEqual(EventStatus.COMPLETED);
       }
     });
 

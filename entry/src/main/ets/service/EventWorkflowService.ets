@@ -2,7 +2,8 @@ import {
   SecurityEvent,
   EventStatus,
   EventPriority,
-  EventType
+  EventType,
+  OperationRecord
 } from '../model/SecurityEvent';
 
 import { Task, TaskStatus } from '../model/Task';
@@ -27,6 +28,7 @@ export interface HazardReport {
   description: string;
   reporter?: string;
   priority?: EventPriority;
+  attachmentPaths?: string[];
 }
 
 /**
@@ -88,6 +90,16 @@ export class EventWorkflowService {
       ? EventWorkflowService.buildSummaryTitle(input.description)
       : trimmedTitle;
     const now: Date = new Date();
+    const reportTime: string = EventSimulator.formatReportTime(now);
+    const initialRecord: OperationRecord = {
+      id: 'AUDIT-' + now.getTime().toString(),
+      eventId: '',
+      operatorId: currentUser === null ? '' : currentUser.id,
+      operatorName: currentUser === null ? '本地用户' : currentUser.name,
+      action: '提交隐患上报',
+      operationTime: reportTime,
+      toStatus: EventStatus.PENDING
+    };
     const event: SecurityEvent = {
       id: EventSimulator.generateEventId(),
       title: finalTitle,
@@ -96,10 +108,13 @@ export class EventWorkflowService {
       description: input.description.trim(),
       reporter: currentUser === null ? '本地用户' : currentUser.name,
       reporterId: currentUser === null ? undefined : currentUser.id,
-      reportTime: EventSimulator.formatReportTime(now),
+      reportTime: reportTime,
       status: EventStatus.PENDING,
-      priority: input.priority === undefined ? EventPriority.MEDIUM : input.priority
+      priority: input.priority === undefined ? EventPriority.MEDIUM : input.priority,
+      attachmentPaths: input.attachmentPaths,
+      history: [initialRecord]
     };
+    initialRecord.eventId = event.id;
     EventRepository.getInstance().saveEvent(event);
     hilog.info(EventWorkflowService.LOG_DOMAIN, EventWorkflowService.LOG_TAG,
       'reportHazard saved: id=%{public}s title=%{public}s location=%{public}s status=%{public}s',

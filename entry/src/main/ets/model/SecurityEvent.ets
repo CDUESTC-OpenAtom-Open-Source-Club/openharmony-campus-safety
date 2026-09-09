@@ -21,6 +21,18 @@ export enum EventType {
   OTHER = '其他'
 }
 
+export interface OperationRecord {
+  id: string;
+  eventId: string;
+  operatorId: string;
+  operatorName: string;
+  action: string;
+  operationTime: string;
+  fromStatus?: EventStatus;
+  toStatus?: EventStatus;
+  note?: string;
+}
+
 export interface SecurityEvent {
   id: string;
   title: string;
@@ -33,4 +45,6 @@ export interface SecurityEvent {
   status: EventStatus;
   priority: EventPriority;
   handler?: string;
+  attachmentPaths?: string[];
+  history?: OperationRecord[];
 }

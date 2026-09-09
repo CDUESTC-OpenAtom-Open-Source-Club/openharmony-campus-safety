@@ -1,5 +1,6 @@
 import {
   SecurityEvent,
+  OperationRecord,
   EventType,
   EventStatus,
   EventPriority
@@ -7,7 +8,7 @@ import {
 import { EventService } from '../service/EventService';
 import { AccountService } from '../service/AccountService';
 import { AppPermission, PermissionService } from '../service/PermissionService';
-import { User } from '../model/User';
+import { User, UserRole } from '../model/User';
 
 @Component
 export struct EventDetailPage {
@@ -25,6 +26,43 @@ export struct EventDetailPage {
 
   private getSecurityUsers(): User[] {
     return AccountService.getSecurityUsers();
+  }
+
+  private canViewHistoryNote(): boolean {
+    const user: User | null = AccountService.getCurrentUser();
+    return user?.role === UserRole.ADMIN || user?.role === UserRole.SECURITY;
+  }
+
+  private isConfirmedProgress(): boolean {
+    return this.getEvent().status !== EventStatus.PENDING;
+  }
+
+  private isAssignedProgress(): boolean {
+    return this.getEvent().handler !== undefined && this.getEvent().handler !== '';
+  }
+
+  private isHandlingProgress(): boolean {
+    const status: EventStatus = this.getEvent().status;
+    return status === EventStatus.PROCESSING || status === EventStatus.REVIEW || status === EventStatus.COMPLETED;
+  }
+
+  private isHandledProgress(): boolean {
+    const status: EventStatus = this.getEvent().status;
+    return status === EventStatus.REVIEW || status === EventStatus.COMPLETED;
+  }
+
+  private getProgressLabel(): string {
+    const status: EventStatus = this.getEvent().status;
+    if (status === EventStatus.PENDING) {
+      return '第 1 阶段 · 待核查';
+    } else if (status === EventStatus.CONFIRMED) {
+      return this.isAssignedProgress() ? '第 3 阶段 · 已指派' : '第 2 阶段 · 已确认';
+    } else if (status === EventStatus.PROCESSING) {
+      return '第 4 阶段 · 现场处置';
+    } else if (status === EventStatus.REVIEW) {
+      return '第 4 阶段 · 待审核';
+    }
+    return '第 5 阶段 · 已闭环';
   }
 
   @Builder
@@ -82,7 +120,7 @@ export struct EventDetailPage {
       .padding({ left: 12, right: 16, top: 14, bottom: 10 })
       .backgroundColor(Color.White)
 
-      if (this.eventId === '') {
+      if (this.getEvent().id === '') {
         Column({ space: 10 }) {
           Text('●')
             .fontSize(32)
@@ -109,13 +147,7 @@ export struct EventDetailPage {
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
                 Blank()
-                Text(
-                  this.taskGenerated
-                    ? '第 3 阶段 · 现场处置'
-                    : this.isConfirmed
-                    ? '第 2 阶段 · 已确认'
-                    : '第 1 阶段 · 待核查'
-                )
+                Text(this.getProgressLabel())
                   .fontSize(10)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#2563EB')
@@ -129,18 +161,29 @@ export struct EventDetailPage {
                 Row()
                   .height(2)
                   .layoutWeight(1)
-                  .backgroundColor(this.isConfirmed || this.taskGenerated ? '#2563EB' : '#E2E8F0')
+                  .backgroundColor(this.isConfirmedProgress() ? '#2563EB' : '#E2E8F0')
                   .margin({ bottom: 18 })
 
-                this.flowNode(2, '确认', this.isConfirmed, this.isConfirmed)
+                this.flowNode(2, '确认', this.isConfirmedProgress(),
+                  this.getEvent().status === EventStatus.CONFIRMED && !this.isAssignedProgress())
 
                 Row()
                   .height(2)
                   .layoutWeight(1)
-                  .backgroundColor(this.taskGenerated ? '#2563EB' : '#E2E8F0')
+                  .backgroundColor(this.isAssignedProgress() ? '#2563EB' : '#E2E8F0')
                   .margin({ bottom: 18 })
 
-                this.flowNode(3, '指派', this.taskGenerated, this.taskGenerated)
+                this.flowNode(3, '指派', this.isAssignedProgress(),
+                  this.getEvent().status === EventStatus.CONFIRMED && this.isAssignedProgress())
+
+                Row()
+                  .height(2)
+                  .layoutWeight(1)
+                  .backgroundColor(this.isHandlingProgress() ? '#2563EB' : '#E2E8F0')
+                  .margin({ bottom: 18 })
+
+                this.flowNode(4, '处置', this.isHandledProgress(),
+                  this.getEvent().status === EventStatus.PROCESSING || this.getEvent().status === EventStatus.REVIEW)
 
                 Row()
                   .height(2)
@@ -148,15 +191,8 @@ export struct EventDetailPage {
                   .backgroundColor(this.getEvent().status === EventStatus.COMPLETED ? '#10B981' : '#E2E8F0')
                   .margin({ bottom: 18 })
 
-                this.flowNode(4, '处置', false, this.getEvent().status === EventStatus.COMPLETED)
-
-                Row()
-                  .height(2)
-                  .layoutWeight(1)
-                  .backgroundColor(this.getEvent().status === EventStatus.COMPLETED ? '#10B981' : '#E2E8F0')
-                  .margin({ bottom: 18 })
-
-                this.flowNode(5, '闭环', false, this.getEvent().status === EventStatus.COMPLETED)
+                this.flowNode(5, '闭环', this.getEvent().status === EventStatus.COMPLETED,
+                  this.getEvent().status === EventStatus.COMPLETED)
               }
               .width('100%')
               .alignItems(VerticalAlign.Bottom)
@@ -286,6 +322,112 @@ export struct EventDetailPage {
             .borderRadius(18)
             .backgroundColor(Color.White)
             .border({ width: 1, color: '#E2E8F0' })
+
+            if ((this.getEvent().attachmentPaths ?? []).length > 0) {
+              Column({ space: 8 }) {
+                Text('现场证据')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#94A3B8')
+                  .width('100%')
+                Row({ space: 8 }) {
+                  ForEach(this.getEvent().attachmentPaths ?? [], (path: string) => {
+                    Image('file://' + path)
+                      .width(82)
+                      .height(82)
+                      .borderRadius(12)
+                      .objectFit(ImageFit.Cover)
+                  }, (path: string) => path)
+                }
+                .width('100%')
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(18)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E2E8F0' })
+            }
+
+            if ((this.getEvent().history ?? []).length > 0) {
+              Column({ space: 10 }) {
+                Text('操作历史')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#94A3B8')
+                  .width('100%')
+                ForEach(this.getEvent().history ?? [], (record: OperationRecord) => {
+                  Row({ space: 10 }) {
+                    Text('●')
+                      .fontSize(10)
+                      .fontColor('#2563EB')
+                    Column({ space: 3 }) {
+                      Text(record.action)
+                        .fontSize(12)
+                        .fontWeight(FontWeight.Bold)
+                        .fontColor('#0F172A')
+                      Text(record.operatorName + '  ·  ' + record.operationTime)
+                        .fontSize(10)
+                        .fontColor('#64748B')
+                      if (this.canViewHistoryNote() && record.note !== undefined && record.note !== '') {
+                        Text(record.note)
+                          .fontSize(10)
+                          .fontColor('#475569')
+                          .padding({ top: 3 })
+                      }
+                    }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start)
+                  }
+                  .width('100%')
+                  .alignItems(VerticalAlign.Top)
+                }, (record: OperationRecord) => record.id)
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(18)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E2E8F0' })
+            }
+
+            if (EventService.getCompletionFeedback(this.eventId) !== '') {
+              Column({ space: 8 }) {
+                Text('最终处理反馈')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#047857')
+                  .width('100%')
+                Text(EventService.getCompletionFeedback(this.eventId))
+                  .fontSize(12)
+                  .fontColor('#065F46')
+                  .lineHeight(20)
+                  .width('100%')
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(18)
+              .backgroundColor('#ECFDF5')
+              .border({ width: 1, color: '#A7F3D0' })
+            }
+
+            if (EventService.getCompletionFeedback(this.eventId) !== '') {
+              Column({ space: 8 }) {
+                Text('最终处理反馈')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#059669')
+                  .width('100%')
+                Text(EventService.getCompletionFeedback(this.eventId))
+                  .fontSize(12)
+                  .fontColor('#14532D')
+                  .lineHeight(20)
+                  .width('100%')
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(18)
+              .backgroundColor('#ECFDF5')
+              .border({ width: 1, color: '#A7F3D0' })
+            }
 
             // 操作按钮
             if (

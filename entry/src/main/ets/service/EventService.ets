@@ -1,6 +1,7 @@
 import {
   SecurityEvent,
-  EventStatus
+  EventStatus,
+  OperationRecord
 } from '../model/SecurityEvent';
 
 import {
@@ -54,7 +55,32 @@ export class EventService {
 
   static getEventById(id: string): SecurityEvent | undefined {
     EventService.ensureSeeded();
-    return EventRepository.getInstance().getEventById(id);
+    const repository: EventRepository = EventRepository.getInstance();
+    const event: SecurityEvent | undefined = repository.getEventById(id);
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (event === undefined || currentUser === null) {
+      return undefined;
+    }
+    if (currentUser.role === UserRole.ADMIN) {
+      return event;
+    }
+    if (currentUser.role === UserRole.SECURITY) {
+      const task: Task | undefined = repository.getTaskByEventId(id);
+      return task !== undefined && task.assignee === currentUser.id ? event : undefined;
+    }
+    return event.reporterId === currentUser.id ? event : undefined;
+  }
+
+  static getCompletionFeedback(eventId: string): string {
+    const event: SecurityEvent | undefined = EventService.getEventById(eventId);
+    if (event === undefined || event.status !== EventStatus.COMPLETED) {
+      return '';
+    }
+    const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(eventId);
+    if (task === undefined || task.status !== TaskStatus.COMPLETED || task.result === undefined) {
+      return '';
+    }
+    return task.result;
   }
 
   static setSelectedEventId(id: string): void {
@@ -75,6 +101,7 @@ export class EventService {
       return false;
     }
     event.status = EventStatus.CONFIRMED;
+    EventService.appendHistory(event, '确认事件', EventStatus.PENDING, EventStatus.CONFIRMED);
     EventRepository.getInstance().updateEvent(event);
     return true;
   }
@@ -112,6 +139,11 @@ export class EventService {
 
     EventRepository.getInstance().saveTask(newTask);
     event.handler = newTask.assignee;
+    const assigneeUser: User | undefined = AccountService.getSecurityUsers().find(
+      (user: User) => user.id === newTask.assignee
+    );
+    EventService.appendHistory(event, '指派处置任务', EventStatus.CONFIRMED, EventStatus.CONFIRMED,
+      '负责人：' + (assigneeUser === undefined ? newTask.assignee : assigneeUser.name));
     EventRepository.getInstance().updateEvent(event);
     return true;
   }
@@ -169,6 +201,7 @@ export class EventService {
     if (event !== undefined &&
       (event.status === EventStatus.CONFIRMED || event.status === EventStatus.PENDING)) {
       event.status = EventStatus.PROCESSING;
+      EventService.appendHistory(event, '接单并开始处置', EventStatus.CONFIRMED, EventStatus.PROCESSING);
       repository.updateEvent(event);
     }
     return true;
@@ -194,6 +227,7 @@ export class EventService {
     const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
     if (event !== undefined && event.status === EventStatus.PROCESSING) {
       event.status = EventStatus.REVIEW;
+      EventService.appendHistory(event, '提交处置结果', EventStatus.PROCESSING, EventStatus.REVIEW, trimmedResult);
       repository.updateEvent(event);
     }
     return true;
@@ -214,6 +248,7 @@ export class EventService {
     const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
     if (event !== undefined && event.status === EventStatus.REVIEW) {
       event.status = EventStatus.COMPLETED;
+      EventService.appendHistory(event, '审核通过', EventStatus.REVIEW, EventStatus.COMPLETED);
       repository.updateEvent(event);
     }
     return true;
@@ -236,6 +271,7 @@ export class EventService {
     const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
     if (event !== undefined && event.status === EventStatus.REVIEW) {
       event.status = EventStatus.PROCESSING;
+      EventService.appendHistory(event, '驳回返工', EventStatus.REVIEW, EventStatus.PROCESSING, trimmedReason);
       repository.updateEvent(event);
     }
     return true;
@@ -254,6 +290,23 @@ export class EventService {
 
     return year + '-' + month + '-' + day +
       ' ' + hour + ':' + minute + ':' + second;
+  }
+
+  private static appendHistory(event: SecurityEvent, action: string, fromStatus: EventStatus,
+    toStatus: EventStatus, note?: string): void {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    const record: OperationRecord = {
+      id: 'AUDIT-' + Date.now().toString() + '-' + ((event.history ?? []).length + 1).toString(),
+      eventId: event.id,
+      operatorId: currentUser === null ? '' : currentUser.id,
+      operatorName: currentUser === null ? '本地用户' : currentUser.name,
+      action: action,
+      operationTime: EventService.getCurrentTime(),
+      fromStatus: fromStatus,
+      toStatus: toStatus,
+      note: note
+    };
+    event.history = (event.history ?? []).concat([record]);
   }
 
   private static ensureSeeded(): void {

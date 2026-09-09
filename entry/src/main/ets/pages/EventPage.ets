@@ -4,6 +4,8 @@ import {
   EventStatus
 } from '../model/SecurityEvent';
 import { EventService } from '../service/EventService';
+import { AccountService } from '../service/AccountService';
+import { User, UserRole } from '../model/User';
 
 interface PriorityFilter {
   id: string;
@@ -33,8 +35,14 @@ export struct EventPage {
     { id: '待确认', label: '待确认' },
     { id: '已确认', label: '已确认' },
     { id: '处理中', label: '处理中' },
+    { id: '待审核', label: '待审核' },
     { id: '已完成', label: '已完成' }
   ];
+
+  private isPersonalView(): boolean {
+    const user: User | null = AccountService.getCurrentUser();
+    return user?.role === UserRole.STUDENT || user?.role === UserRole.TEACHER;
+  }
 
   private getPriorityBg(priority: EventPriority): string {
     if (priority === EventPriority.URGENT) {
@@ -65,6 +73,8 @@ export struct EventPage {
       return '#2563EB';
     } else if (status === EventStatus.PROCESSING) {
       return '#4F46E5';
+    } else if (status === EventStatus.REVIEW) {
+      return '#7C3AED';
     } else if (status === EventStatus.COMPLETED) {
       return '#059669';
     }
@@ -100,12 +110,12 @@ export struct EventPage {
           })
 
         Column() {
-          Text('安全事件')
+          Text(this.isPersonalView() ? '我的上报' : '安全事件')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor('#0F172A')
 
-          Text('校园安全隐患汇聚与流转')
+          Text(this.isPersonalView() ? '查看本账号上报与处理进度' : '校园安全隐患汇聚与流转')
             .fontSize(10)
             .fontColor('#94A3B8')
             .margin({ top: 2 })
@@ -197,11 +207,11 @@ export struct EventPage {
           Text('◆')
             .fontSize(34)
             .fontColor('#CBD5E1')
-          Text('未找到符合条件的安全事件')
+          Text(this.isPersonalView() ? '暂无符合条件的上报' : '未找到符合条件的安全事件')
             .fontSize(14)
             .fontWeight(FontWeight.Bold)
             .fontColor('#475569')
-          Text('您可以调整检索词或切换优先级分类')
+          Text(this.events.length === 0 && this.isPersonalView() ? '提交隐患后可在此跟踪处理进度' : '您可以调整检索词或切换筛选条件')
             .fontSize(12)
             .fontColor('#94A3B8')
         }
@@ -323,6 +333,7 @@ export struct EventPage {
     .translate({ y: this.pageReady ? 0 : 18 })
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
+      this.events = EventService.getAllEvents().slice();
       this.pageReady = true;
     })
   }

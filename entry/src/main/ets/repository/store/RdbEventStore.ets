@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 
 import {
   SecurityEvent,
+  OperationRecord,
   EventStatus,
   EventPriority,
   EventType
@@ -11,7 +12,7 @@ import { Task, TaskStatus } from '../../model/Task';
 import { EventStore } from './EventStore';
 
 const DB_NAME: string = 'campus_safety.db';
-const DB_VERSION: number = 4;
+const DB_VERSION: number = 6;
 
 /**
  * relationalStore 存储实现（C 模块，真机/云手机用）。
@@ -41,7 +42,8 @@ export class RdbEventStore implements EventStore {
       'CREATE TABLE IF NOT EXISTS security_event (' +
       'id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL, ' +
       'location TEXT NOT NULL, description TEXT NOT NULL, reporter TEXT NOT NULL, reporterId TEXT, ' +
-      'reportTime TEXT NOT NULL, status TEXT NOT NULL, priority TEXT NOT NULL, handler TEXT)'
+      'reportTime TEXT NOT NULL, status TEXT NOT NULL, priority TEXT NOT NULL, handler TEXT, ' +
+      'attachmentPaths TEXT, history TEXT)'
     );
     await this.rdbStore.executeSql(
       'CREATE TABLE IF NOT EXISTS task (' +
@@ -54,6 +56,12 @@ export class RdbEventStore implements EventStore {
     const eventColumns: string[] = await this.getTableColumns('security_event');
     if (!eventColumns.includes('reporterId')) {
       await this.rdbStore.executeSql('ALTER TABLE security_event ADD COLUMN reporterId TEXT');
+    }
+    if (!eventColumns.includes('attachmentPaths')) {
+      await this.rdbStore.executeSql('ALTER TABLE security_event ADD COLUMN attachmentPaths TEXT');
+    }
+    if (!eventColumns.includes('history')) {
+      await this.rdbStore.executeSql('ALTER TABLE security_event ADD COLUMN history TEXT');
     }
 
     // v1 的 task 表没有处理结果和完成时间。按实际列状态执行幂等迁移，
@@ -162,6 +170,9 @@ export class RdbEventStore implements EventStore {
   private eventToBucket(event: SecurityEvent): ValuesBucket {
     const handler: string | null = event.handler === undefined ? null : event.handler;
     const reporterId: string | null = event.reporterId === undefined ? null : event.reporterId;
+    const attachmentPaths: string | null = event.attachmentPaths === undefined ? null :
+      JSON.stringify(event.attachmentPaths);
+    const history: string | null = event.history === undefined ? null : JSON.stringify(event.history);
     const bucket: ValuesBucket = {
       'id': event.id,
       'title': event.title,
@@ -173,7 +184,9 @@ export class RdbEventStore implements EventStore {
       'reportTime': event.reportTime,
       'status': event.status,
       'priority': event.priority,
-      'handler': handler
+      'handler': handler,
+      'attachmentPaths': attachmentPaths,
+      'history': history
     };
     return bucket;
   }
@@ -181,6 +194,8 @@ export class RdbEventStore implements EventStore {
   private rowToEvent(resultSet: relationalStore.ResultSet): SecurityEvent {
     const handlerValue: string = resultSet.getString(resultSet.getColumnIndex('handler'));
     const reporterIdValue: string = resultSet.getString(resultSet.getColumnIndex('reporterId'));
+    const attachmentPathsValue: string = resultSet.getString(resultSet.getColumnIndex('attachmentPaths'));
+    const historyValue: string = resultSet.getString(resultSet.getColumnIndex('history'));
     const event: SecurityEvent = {
       id: resultSet.getString(resultSet.getColumnIndex('id')),
       title: resultSet.getString(resultSet.getColumnIndex('title')),
@@ -192,9 +207,35 @@ export class RdbEventStore implements EventStore {
       reportTime: resultSet.getString(resultSet.getColumnIndex('reportTime')),
       status: resultSet.getString(resultSet.getColumnIndex('status')) as EventStatus,
       priority: resultSet.getString(resultSet.getColumnIndex('priority')) as EventPriority,
-      handler: handlerValue === '' ? undefined : handlerValue
+      handler: handlerValue === '' ? undefined : handlerValue,
+      attachmentPaths: this.parseAttachmentPaths(attachmentPathsValue),
+      history: this.parseHistory(historyValue)
     };
     return event;
+  }
+
+  private parseAttachmentPaths(value: string): string[] | undefined {
+    if (value === '') {
+      return undefined;
+    }
+    try {
+      return JSON.parse(value) as string[];
+    } catch (error) {
+      console.error('RdbEventStore: invalid attachmentPaths JSON');
+      return undefined;
+    }
+  }
+
+  private parseHistory(value: string): OperationRecord[] | undefined {
+    if (value === '') {
+      return undefined;
+    }
+    try {
+      return JSON.parse(value) as OperationRecord[];
+    } catch (error) {
+      console.error('RdbEventStore: invalid history JSON');
+      return undefined;
+    }
   }
 
   private rowToTask(resultSet: relationalStore.ResultSet): Task {

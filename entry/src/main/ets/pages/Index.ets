@@ -22,7 +22,7 @@ import { EventService } from '../service/EventService';
 import { EmergencyContactService } from '../service/EmergencyContactService';
 import { AccountService } from '../service/AccountService';
 import { AppPermission, PermissionService } from '../service/PermissionService';
-import { User } from '../model/User';
+import { User, UserRole } from '../model/User';
 import { promptAction } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 
@@ -89,6 +89,8 @@ struct Index {
     }
     this.currentTab = name;
     if (name === 'Index') {
+      this.events = EventService.getAllEvents().slice();
+      this.tasks = EventService.getAllTasks().slice();
       this.pageStack.clear();
       return;
     }
@@ -102,6 +104,11 @@ struct Index {
 
   private currentUser(): User | null {
     return AccountService.getCurrentUser();
+  }
+
+  private isPersonalUser(): boolean {
+    const user: User | null = this.currentUser();
+    return user?.role === UserRole.STUDENT || user?.role === UserRole.TEACHER;
   }
 
   private completeLogout(): void {
@@ -229,7 +236,10 @@ struct Index {
     } else if (name === 'ReportPage') {
       NavDestination() {
         ReportPage({
-          pageStack: this.pageStack
+          pageStack: this.pageStack,
+          onReported: (): void => {
+            this.events = EventService.getAllEvents().slice();
+          }
         })
       }
       .title('隐患上报')
@@ -829,8 +839,8 @@ struct Index {
               Row() {
                 Column({ space: 10 }) {
                   this.bentoCard(
-                    '安全事件',
-                    '核查、确权与指派',
+                    this.isPersonalUser() ? '我的上报' : '安全事件',
+                    this.isPersonalUser() ? '查看处理进度与反馈' : '核查、确权与指派',
                     this.events.length.toString() + ' 件',
                     '#2563EB',
                     '#EFF6FF',
@@ -889,7 +899,7 @@ struct Index {
               // 最新流转事件
               // ========================
               Row() {
-                Text('最新流转事件')
+                Text(this.isPersonalUser() ? '我的最新上报' : '最新流转事件')
                   .fontSize(12)
                   .fontWeight(FontWeight.Bold)
                   .fontColor('#334155')
@@ -994,7 +1004,7 @@ struct Index {
         if (!this.showSchedulePage) {
           Row() {
           this.tabItem('Index', '首页', $r('app.media.ic_home'))
-          this.tabItem('EventPage', '事件', $r('app.media.ic_event'))
+          this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件', $r('app.media.ic_event'))
 
           Column() {
             Row() {

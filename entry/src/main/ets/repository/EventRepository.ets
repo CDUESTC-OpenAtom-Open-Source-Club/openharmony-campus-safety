@@ -77,7 +77,9 @@ export class EventRepository {
           reportTime: seed.reportTime,
           status: seed.status,
           priority: seed.priority,
-          handler: seed.handler
+          handler: seed.handler,
+          attachmentPaths: seed.attachmentPaths,
+          history: seed.history
         };
         return clone;
       });
