@@ -40,6 +40,11 @@ export struct StudentSchedulePage {
     await ScheduleService.saveCourses(getContext(this) as common.Context, this.courses);
   }
 
+  private getCurrentWeekday(): number {
+    const day: number = new Date().getDay();
+    return day === 0 ? 7 : day;
+  }
+
   private courseAt(weekday: number, period: number): Course | undefined {
     return this.courses.find((course: Course) =>
       course.weekday === weekday && course.startPeriod === period
@@ -212,9 +217,9 @@ export struct StudentSchedulePage {
   weekHeader() {
     Row() {
       Column() {
-        Text('第').fontSize(11).fontColor('#9CA3AF')
-        Text('3').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#374151').margin({ top: 2, bottom: 2 })
-        Text('周').fontSize(11).fontColor('#9CA3AF')
+        Text('本').fontSize(11).fontColor('#9CA3AF')
+        Text('周').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#374151').margin({ top: 2, bottom: 2 })
+        Text('课表').fontSize(11).fontColor('#9CA3AF')
       }
       .width(48)
       .height(70)
@@ -225,10 +230,10 @@ export struct StudentSchedulePage {
       ForEach(this.weekdays, (day: string, index: number) => {
         Column({ space: 4 }) {
           Text(day).fontSize(12).fontColor('#374151').textAlign(TextAlign.Center).width('100%')
-          Text(index === 6 ? '今天' : (index < 5 ? '有课' : '无'))
+          Text(index + 1 === this.getCurrentWeekday() ? '今天' : '')
             .fontSize(9)
-            .fontWeight(index === 6 ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(index === 6 ? '#2563EB' : (index < 5 ? '#9CA3AF' : '#D1D5DB'))
+            .fontWeight(index + 1 === this.getCurrentWeekday() ? FontWeight.Bold : FontWeight.Normal)
+            .fontColor(index + 1 === this.getCurrentWeekday() ? '#2563EB' : '#9CA3AF')
             .textAlign(TextAlign.Center)
             .width('100%')
         }
@@ -276,7 +281,7 @@ export struct StudentSchedulePage {
       .padding(6)
       .borderRadius(8)
       .backgroundColor(this.bg(this.courseAt(weekday, period)!.color))
-      .border({ width: this.courseAt(weekday, period)!.name === '数据结构' ? 2 : 0, color: '#2563EB' })
+      .border({ width: 0, color: '#2563EB' })
       .onClick(() => this.openEdit(this.courseAt(weekday, period)!))
     }
   }
@@ -467,6 +472,15 @@ export struct StudentSchedulePage {
                 .fontColor('#334155')
                 .width('100%')
                 .margin({ bottom: 8 })
+
+              if (this.courses.length === 0) {
+                Text('暂无课程，点击右上角「＋」添加课程')
+                  .fontSize(12)
+                  .fontColor('#94A3B8')
+                  .width('100%')
+                  .textAlign(TextAlign.Center)
+                  .padding({ top: 16, bottom: 16 })
+              }
 
               ForEach(this.courses, (course: Course) => {
                 Row() {

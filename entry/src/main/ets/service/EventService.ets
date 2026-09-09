@@ -1,6 +1,7 @@
 import {
   SecurityEvent,
   EventStatus,
+  EventPriority,
   OperationRecord
 } from '../model/SecurityEvent';
 
@@ -106,7 +107,7 @@ export class EventService {
     return true;
   }
 
-  static createTaskFromEvent(id: string, assignee: string = 'inspector_001'): boolean {
+  static createTaskFromEvent(id: string, assignee: string): boolean {
     if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.DISPATCH_TASK)) {
       return false;
     }
@@ -126,6 +127,7 @@ export class EventService {
       return false;
     }
 
+    const createTime: string = EventService.getCurrentTime();
     const newTask: Task = {
       id: 'TASK-' + event.id,
       eventId: event.id,
@@ -133,7 +135,8 @@ export class EventService {
       location: event.location,
       description: event.description,
       assignee: normalizedAssignee,
-      createTime: event.reportTime,
+      createTime: createTime,
+      deadline: EventService.getDeadline(event.priority),
       status: TaskStatus.PENDING
     };
 
@@ -166,6 +169,25 @@ export class EventService {
     return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
   }
 
+  static getUnassignedEvents(): SecurityEvent[] {
+    if (!PermissionService.can(AccountService.getCurrentUser(), AppPermission.DISPATCH_TASK)) {
+      return [];
+    }
+    const repository: EventRepository = EventRepository.getInstance();
+    const assignedEventIds: string[] = repository.getAllTasks().map((task: Task) => task.eventId);
+    return repository.getEvents().filter((event: SecurityEvent) =>
+      event.status === EventStatus.CONFIRMED && !assignedEventIds.includes(event.id)
+    );
+  }
+
+  static isTaskOverdue(task: Task): boolean {
+    if (task.status === TaskStatus.COMPLETED || task.deadline === undefined || task.deadline === '') {
+      return false;
+    }
+    const deadlineTime: number = new Date(task.deadline.replace(' ', 'T')).getTime();
+    return deadlineTime < Date.now();
+  }
+
   static getTaskByEventId(eventId: string): Task | undefined {
     const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(eventId);
     if (task === undefined) {
@@ -196,6 +218,9 @@ export class EventService {
       return false;
     }
     task.status = TaskStatus.PROCESSING;
+    if (task.acceptedTime === undefined || task.acceptedTime === '') {
+      task.acceptedTime = EventService.getCurrentTime();
+    }
     repository.saveTask(task);
     const event: SecurityEvent | undefined = repository.getEventById(task.eventId);
     if (event !== undefined &&
@@ -216,7 +241,8 @@ export class EventService {
     const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
     const trimmedResult: string = result.trim();
     if (task === undefined || task.status !== TaskStatus.PROCESSING || trimmedResult === '' ||
-      (currentUser?.role !== UserRole.ADMIN && task.assignee !== currentUser?.id)) {
+      (currentUser?.role !== UserRole.ADMIN && task.assignee !== currentUser?.id) ||
+      (currentUser?.role === UserRole.SECURITY && (task.afterAttachmentPaths ?? []).length === 0)) {
       return false;
     }
     task.status = TaskStatus.REVIEW;
@@ -231,6 +257,28 @@ export class EventService {
       repository.updateEvent(event);
     }
     return true;
+  }
+
+  static updateTaskEvidence(taskId: string, beforePaths: string[], afterPaths: string[]): boolean {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (!PermissionService.can(currentUser, AppPermission.SUBMIT_TASK)) {
+      return false;
+    }
+    const repository: EventRepository = EventRepository.getInstance();
+    const task: Task | undefined = repository.getAllTasks().find((item: Task) => item.id === taskId);
+    if (task === undefined || task.status !== TaskStatus.PROCESSING ||
+      !EventService.areValidEvidencePaths(beforePaths) || !EventService.areValidEvidencePaths(afterPaths) ||
+      (currentUser?.role !== UserRole.ADMIN && task.assignee !== currentUser?.id)) {
+      return false;
+    }
+    task.beforeAttachmentPaths = beforePaths.slice();
+    task.afterAttachmentPaths = afterPaths.slice();
+    repository.saveTask(task);
+    return true;
+  }
+
+  private static areValidEvidencePaths(paths: string[]): boolean {
+    return paths.length <= 3 && paths.every((path: string) => path.trim() !== '');
   }
 
   static approveTask(taskId: string): boolean {
@@ -278,7 +326,22 @@ export class EventService {
   }
 
   private static getCurrentTime(): string {
-    const now = new Date();
+    return EventService.formatTime(new Date());
+  }
+
+  private static getDeadline(priority: EventPriority): string {
+    let hours: number = 24;
+    if (priority === EventPriority.URGENT) {
+      hours = 2;
+    } else if (priority === EventPriority.HIGH) {
+      hours = 4;
+    } else if (priority === EventPriority.LOW) {
+      hours = 72;
+    }
+    return EventService.formatTime(new Date(Date.now() + hours * 60 * 60 * 1000));
+  }
+
+  private static formatTime(now: Date): string {
 
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');

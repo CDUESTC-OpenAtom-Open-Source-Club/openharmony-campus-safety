@@ -102,7 +102,8 @@ export default function permissionTest() {
       });
       AccountService.setCurrentUserForTest(TEST_STUDENT);
       expect(EventService.confirmEvent('EVT-AUTH-1')).assertFalse();
-      expect(EventService.createTaskFromEvent('EVT-AUTH-1')).assertFalse();
+      expect(EventService.createTaskFromEvent('EVT-AUTH-1', TEST_SECURITY.id)).assertFalse();
+      expect(EventService.updateTaskEvidence('TASK-NOT-OWNED', ['/before.jpg'], ['/after.jpg'])).assertFalse();
     });
 
     it('security_cannot_process_another_assignees_task', 0, () => {
@@ -131,6 +132,39 @@ export default function permissionTest() {
       AccountService.setCurrentUserForTest(TEST_SECURITY);
       expect(EventService.startTask('TASK-AUTH-2')).assertFalse();
       expect(EventService.getAllTasks().length).assertEqual(0);
+    });
+
+    it('security_requires_after_evidence_before_review_submission', 0, () => {
+      const repo: EventRepository = EventRepository.getInstance();
+      repo.saveEvent({
+        id: 'EVT-EVIDENCE-1',
+        title: '处置证据测试',
+        type: EventType.FACILITY,
+        location: '测试地点',
+        description: '验证处置后图片是必需项',
+        reporter: TEST_STUDENT.name,
+        reporterId: TEST_STUDENT.id,
+        reportTime: '2026-09-09 13:00:00',
+        status: EventStatus.CONFIRMED,
+        priority: EventPriority.MEDIUM,
+        handler: TEST_SECURITY.id
+      });
+      repo.saveTask({
+        id: 'TASK-EVIDENCE-1',
+        eventId: 'EVT-EVIDENCE-1',
+        title: '处置证据测试',
+        location: '测试地点',
+        description: '上传现场处置证据',
+        assignee: TEST_SECURITY.id,
+        createTime: '2026-09-09 13:05:00',
+        status: TaskStatus.PENDING
+      });
+
+      AccountService.setCurrentUserForTest(TEST_SECURITY);
+      expect(EventService.startTask('TASK-EVIDENCE-1')).assertTrue();
+      expect(EventService.submitTaskForReview('TASK-EVIDENCE-1', '已处置')).assertFalse();
+      expect(EventService.updateTaskEvidence('TASK-EVIDENCE-1', [], ['/after.jpg'])).assertTrue();
+      expect(EventService.submitTaskForReview('TASK-EVIDENCE-1', '已处置')).assertTrue();
     });
   });
 }

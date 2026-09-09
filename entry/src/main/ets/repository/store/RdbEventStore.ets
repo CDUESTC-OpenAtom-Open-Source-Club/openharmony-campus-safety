@@ -12,7 +12,7 @@ import { Task, TaskStatus } from '../../model/Task';
 import { EventStore } from './EventStore';
 
 const DB_NAME: string = 'campus_safety.db';
-const DB_VERSION: number = 6;
+const DB_VERSION: number = 8;
 
 /**
  * relationalStore 存储实现（C 模块，真机/云手机用）。
@@ -49,8 +49,8 @@ export class RdbEventStore implements EventStore {
       'CREATE TABLE IF NOT EXISTS task (' +
       'id TEXT PRIMARY KEY, eventId TEXT NOT NULL, title TEXT NOT NULL, ' +
       'location TEXT NOT NULL, description TEXT NOT NULL, assignee TEXT NOT NULL, ' +
-      'createTime TEXT NOT NULL, status TEXT NOT NULL, result TEXT, completedTime TEXT, ' +
-      'submittedTime TEXT, rejectionReason TEXT)'
+      'createTime TEXT NOT NULL, acceptedTime TEXT, deadline TEXT, status TEXT NOT NULL, result TEXT, completedTime TEXT, ' +
+      'submittedTime TEXT, rejectionReason TEXT, beforeAttachmentPaths TEXT, afterAttachmentPaths TEXT)'
     );
 
     const eventColumns: string[] = await this.getTableColumns('security_event');
@@ -78,6 +78,18 @@ export class RdbEventStore implements EventStore {
     }
     if (!taskColumns.includes('rejectionReason')) {
       await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN rejectionReason TEXT');
+    }
+    if (!taskColumns.includes('beforeAttachmentPaths')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN beforeAttachmentPaths TEXT');
+    }
+    if (!taskColumns.includes('afterAttachmentPaths')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN afterAttachmentPaths TEXT');
+    }
+    if (!taskColumns.includes('acceptedTime')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN acceptedTime TEXT');
+    }
+    if (!taskColumns.includes('deadline')) {
+      await this.rdbStore.executeSql('ALTER TABLE task ADD COLUMN deadline TEXT');
     }
     if (this.rdbStore.version < DB_VERSION) {
       this.rdbStore.version = DB_VERSION;
@@ -149,7 +161,13 @@ export class RdbEventStore implements EventStore {
     const result: string | null = task.result === undefined ? null : task.result;
     const completedTime: string | null = task.completedTime === undefined ? null : task.completedTime;
     const submittedTime: string | null = task.submittedTime === undefined ? null : task.submittedTime;
+    const acceptedTime: string | null = task.acceptedTime === undefined ? null : task.acceptedTime;
+    const deadline: string | null = task.deadline === undefined ? null : task.deadline;
     const rejectionReason: string | null = task.rejectionReason === undefined ? null : task.rejectionReason;
+    const beforeAttachmentPaths: string | null = task.beforeAttachmentPaths === undefined ? null :
+      JSON.stringify(task.beforeAttachmentPaths);
+    const afterAttachmentPaths: string | null = task.afterAttachmentPaths === undefined ? null :
+      JSON.stringify(task.afterAttachmentPaths);
     const values: ValuesBucket = {
       'id': task.id,
       'eventId': task.eventId,
@@ -158,11 +176,15 @@ export class RdbEventStore implements EventStore {
       'description': task.description,
       'assignee': task.assignee,
       'createTime': task.createTime,
+      'acceptedTime': acceptedTime,
+      'deadline': deadline,
       'status': task.status,
       'result': result,
       'completedTime': completedTime,
       'submittedTime': submittedTime,
-      'rejectionReason': rejectionReason
+      'rejectionReason': rejectionReason,
+      'beforeAttachmentPaths': beforeAttachmentPaths,
+      'afterAttachmentPaths': afterAttachmentPaths
     };
     await this.rdbStore.insert('task', values, relationalStore.ConflictResolution.ON_CONFLICT_REPLACE);
   }
@@ -242,7 +264,13 @@ export class RdbEventStore implements EventStore {
     const resultValue: string = resultSet.getString(resultSet.getColumnIndex('result'));
     const completedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('completedTime'));
     const submittedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('submittedTime'));
+    const acceptedTimeValue: string = resultSet.getString(resultSet.getColumnIndex('acceptedTime'));
+    const deadlineValue: string = resultSet.getString(resultSet.getColumnIndex('deadline'));
     const rejectionReasonValue: string = resultSet.getString(resultSet.getColumnIndex('rejectionReason'));
+    const beforeAttachmentPathsValue: string =
+      resultSet.getString(resultSet.getColumnIndex('beforeAttachmentPaths'));
+    const afterAttachmentPathsValue: string =
+      resultSet.getString(resultSet.getColumnIndex('afterAttachmentPaths'));
     const task: Task = {
       id: resultSet.getString(resultSet.getColumnIndex('id')),
       eventId: resultSet.getString(resultSet.getColumnIndex('eventId')),
@@ -251,11 +279,15 @@ export class RdbEventStore implements EventStore {
       description: resultSet.getString(resultSet.getColumnIndex('description')),
       assignee: resultSet.getString(resultSet.getColumnIndex('assignee')),
       createTime: resultSet.getString(resultSet.getColumnIndex('createTime')),
+      acceptedTime: acceptedTimeValue === '' ? undefined : acceptedTimeValue,
+      deadline: deadlineValue === '' ? undefined : deadlineValue,
       status: resultSet.getString(resultSet.getColumnIndex('status')) as TaskStatus,
       result: resultValue === '' ? undefined : resultValue,
       completedTime: completedTimeValue === '' ? undefined : completedTimeValue,
       submittedTime: submittedTimeValue === '' ? undefined : submittedTimeValue,
-      rejectionReason: rejectionReasonValue === '' ? undefined : rejectionReasonValue
+      rejectionReason: rejectionReasonValue === '' ? undefined : rejectionReasonValue,
+      beforeAttachmentPaths: this.parseAttachmentPaths(beforeAttachmentPathsValue),
+      afterAttachmentPaths: this.parseAttachmentPaths(afterAttachmentPathsValue)
     };
     return task;
   }

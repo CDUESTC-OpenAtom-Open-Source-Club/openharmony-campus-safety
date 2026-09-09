@@ -18,7 +18,7 @@ export struct EventDetailPage {
   @State private eventId: string = EventService.getSelectedEventId();
   @State private isConfirmed: boolean = false;
   @State private taskGenerated: boolean = false;
-  @State private selectedAssigneeId: string = 'inspector_001';
+  @State private selectedAssigneeId: string = '';
 
   private can(permission: AppPermission): boolean {
     return PermissionService.can(AccountService.getCurrentUser(), permission);
@@ -479,6 +479,13 @@ export struct EventDetailPage {
                 }
                 .width('100%')
 
+                if (this.getSecurityUsers().length === 0) {
+                  Text('暂无可用安保账号，请先配置负责人')
+                    .fontSize(11)
+                    .fontColor('#B45309')
+                    .width('100%')
+                }
+
               Button('下发并生成现场处置任务')
                 .width('100%')
                 .height(46)
@@ -489,6 +496,8 @@ export struct EventDetailPage {
                 .fontWeight(FontWeight.Bold)
                 .shadow({ radius: 10, color: 'rgba(14,165,233,0.25)', offsetY: 4 })
                 .margin({ top: 10 })
+                .enabled(this.selectedAssigneeId !== '')
+                .opacity(this.selectedAssigneeId === '' ? 0.5 : 1)
                 .onClick(() => {
                   if (EventService.createTaskFromEvent(this.eventId, this.selectedAssigneeId)) {
                     this.taskGenerated = true;

@@ -21,13 +21,18 @@ export struct EmergencyContactPage {
 
   private save(): void {
     const trimmed: string = this.phone.trim();
-    if (trimmed === '') {
-      promptAction.showToast({ message: '请输入紧急联系电话' });
+    if (!EmergencyContactService.isValidPhone(trimmed)) {
+      promptAction.showToast({ message: '请输入 6—20 位有效电话号码，可包含 + 号' });
       return;
     }
     const context = getContext(this) as common.Context;
-    EmergencyContactService.savePhone(context, trimmed).then(() => {
-      AppStorage.setOrCreate('emergencyPhone', trimmed);
+    EmergencyContactService.savePhone(context, trimmed).then((saved: boolean) => {
+      if (!saved) {
+        promptAction.showToast({ message: '号码格式无效，请重新输入' });
+        return;
+      }
+      const normalized: string = EmergencyContactService.normalizePhone(trimmed);
+      AppStorage.setOrCreate('emergencyPhone', normalized);
       promptAction.showToast({ message: '应急联系电话已保存' });
       this.pageStack.pop();
     }).catch((err: Error) => {
@@ -53,7 +58,7 @@ export struct EmergencyContactPage {
             .fontWeight(FontWeight.Bold)
             .fontColor('#0F172A')
 
-          Text('用于一键求助时自动发送短信并拨号')
+          Text('仅打开系统短信编辑或拨号界面，由你确认后执行')
             .fontSize(10)
             .fontColor('#94A3B8')
             .margin({ top: 2 })
@@ -74,7 +79,7 @@ export struct EmergencyContactPage {
               .width('100%')
 
             TextInput({
-              placeholder: '请输入接收紧急通知的电话号码',
+              placeholder: '请输入本地配置的紧急联系电话',
               text: this.phone
             })
               .type(InputType.PhoneNumber)
@@ -104,7 +109,7 @@ export struct EmergencyContactPage {
               .width('100%')
               .margin({ bottom: 8 })
 
-            Text('保存后，首页点击「一键求助」会先打开短信界面并自动填入该号码与求助内容，随后打开拨号界面。')
+            Text('该号码由当前设备本地保存，不代表已接入学校保卫处或真实应急平台。首页可分别打开短信编辑和拨号界面；应用不会自动发送短信或自动拨号。')
               .fontSize(12)
               .fontColor('#64748B')
               .lineHeight(20)

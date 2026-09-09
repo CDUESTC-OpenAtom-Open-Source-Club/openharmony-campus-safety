@@ -70,7 +70,7 @@ export default function eventWorkflowTest() {
     it('workflow_state_link_task_processing_updates_event', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
@@ -86,7 +86,7 @@ export default function eventWorkflowTest() {
     it('workflow_submit_then_approve_updates_event', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
@@ -123,15 +123,20 @@ export default function eventWorkflowTest() {
         expect(afterConfirm.status).assertEqual(EventStatus.CONFIRMED);
       }
 
-      EventService.createTaskFromEvent(event.id);
+      event.reportTime = '2020-01-01 00:00:00';
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = repo.getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         expect(task.status).assertEqual(TaskStatus.PENDING);
+        expect(task.assignee).assertEqual('inspector_001');
+        expect(task.createTime === event.reportTime).assertFalse();
+        expect(task.deadline === undefined).assertFalse();
       }
 
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
+        expect(task.acceptedTime === undefined).assertFalse();
         const duringProcessing = repo.getEventById(event.id);
         expect(duringProcessing === undefined).assertFalse();
         if (duringProcessing !== undefined) {
@@ -158,7 +163,7 @@ export default function eventWorkflowTest() {
     it('workflow_completed_event_no_downgrade_on_task_rollback', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
@@ -180,10 +185,28 @@ export default function eventWorkflowTest() {
       }
     });
 
+    it('workflow_admin_can_find_unassigned_and_overdue_work', 0, () => {
+      const unassigned: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.confirmEvent(unassigned.id)).assertTrue();
+      expect(EventService.getUnassignedEvents().length).assertEqual(1);
+      expect(EventService.createTaskFromEvent(unassigned.id, '')).assertFalse();
+      expect(EventService.createTaskFromEvent(unassigned.id, 'unknown_inspector')).assertFalse();
+      expect(EventService.createTaskFromEvent(unassigned.id, 'inspector_001')).assertTrue();
+      expect(EventService.getUnassignedEvents().length).assertEqual(0);
+      const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(unassigned.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        task.deadline = '2020-01-01 00:00:00';
+        expect(EventService.isTaskOverdue(task)).assertTrue();
+        task.status = TaskStatus.COMPLETED;
+        expect(EventService.isTaskOverdue(task)).assertFalse();
+      }
+    });
+
     it('workflow_review_rejection_returns_to_processing', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const repo = EventRepository.getInstance();
       const task = repo.getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
@@ -207,11 +230,11 @@ export default function eventWorkflowTest() {
 
     it('workflow_invalid_and_duplicate_transitions_are_rejected', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
-      expect(EventService.createTaskFromEvent(event.id)).assertFalse();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertFalse();
       expect(EventService.confirmEvent(event.id)).assertTrue();
       expect(EventService.confirmEvent(event.id)).assertFalse();
-      expect(EventService.createTaskFromEvent(event.id)).assertTrue();
-      expect(EventService.createTaskFromEvent(event.id)).assertFalse();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertFalse();
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
@@ -226,16 +249,16 @@ export default function eventWorkflowTest() {
     it('workflow_duplicate_confirm_and_dispatch_protected', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const repo = EventRepository.getInstance();
       expect(repo.getAllTasks().length).assertEqual(1);
       expect(repo.getTaskByEventId(event.id) === undefined).assertFalse();
     });
 
     it('workflow_run_full_loop_reaches_completed', 0, () => {
-      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0);
+      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0, 'inspector_001');
       const repo = EventRepository.getInstance();
       const stored = repo.getEventById(event.id);
       expect(stored === undefined).assertFalse();
@@ -296,11 +319,14 @@ export default function eventWorkflowTest() {
     it('workflow_full_loop_records_audit_history', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       expect(EventService.confirmEvent(event.id)).assertTrue();
-      expect(EventService.createTaskFromEvent(event.id)).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertTrue();
       const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.updateTaskEvidence(task.id,
+          ['/data/storage/el2/base/files/evidence/before.jpg'],
+          ['/data/storage/el2/base/files/evidence/after.jpg'])).assertTrue();
         expect(EventService.submitTaskForReview(task.id, '已完成处置')).assertTrue();
         expect(EventService.approveTask(task.id)).assertTrue();
       }
@@ -311,6 +337,10 @@ export default function eventWorkflowTest() {
         expect((stored.history ?? [])[0].action).assertEqual('确认事件');
         expect((stored.history ?? [])[4].action).assertEqual('审核通过');
         expect((stored.history ?? [])[4].toStatus).assertEqual(EventStatus.COMPLETED);
+      }
+      if (task !== undefined) {
+        expect((task.beforeAttachmentPaths ?? []).length).assertEqual(1);
+        expect((task.afterAttachmentPaths ?? []).length).assertEqual(1);
       }
     });
 

@@ -4,6 +4,7 @@ import eventRepositoryTest from './EventRepository.test';
 import eventWorkflowTest from './EventWorkflow.test';
 import stabilityTest from './Stability.test';
 import permissionTest from './Permission.test';
+import emergencyContactTest from './EmergencyContact.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -12,4 +13,5 @@ export default function testsuite() {
   eventWorkflowTest();
   stabilityTest();
   permissionTest();
+  emergencyContactTest();
 }

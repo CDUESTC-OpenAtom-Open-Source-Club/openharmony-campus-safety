@@ -7,6 +7,11 @@ import {
 } from '../service/EventService';
 import { AccountService } from '../service/AccountService';
 import { AppPermission, PermissionService } from '../service/PermissionService';
+import { AttachmentService } from '../service/AttachmentService';
+import { User, UserRole } from '../model/User';
+import { SecurityEvent } from '../model/SecurityEvent';
+import { common } from '@kit.AbilityKit';
+import { promptAction } from '@kit.ArkUI';
 
 interface TaskFilter {
   id: string;
@@ -25,13 +30,27 @@ export struct TaskPage {
   @State private reviewTaskId: string = '';
   @State private rejectionReason: string = '';
 
-  private filters: TaskFilter[] = [
-    { id: 'ALL', label: '全部' },
-    { id: '待处理', label: '待处理' },
-    { id: '处理中', label: '处理中' },
-    { id: '待审核', label: '待审核' },
-    { id: '已完成', label: '已完成' }
-  ];
+  private getFilters(): TaskFilter[] {
+    if (this.isAdmin()) {
+      return [
+        { id: 'ALL', label: '全部' },
+        { id: 'UNASSIGNED', label: '未分配' },
+        { id: 'OVERDUE', label: '已超时' },
+        { id: '待审核', label: '待审核' }
+      ];
+    }
+    return [
+      { id: 'ALL', label: '全部' },
+      { id: '待处理', label: '待处理' },
+      { id: '处理中', label: '处理中' },
+      { id: '待审核', label: '待审核' },
+      { id: '已完成', label: '已完成' }
+    ];
+  }
+
+  private isAdmin(): boolean {
+    return AccountService.getCurrentUser()?.role === UserRole.ADMIN;
+  }
 
   private getStatusColor(status: TaskStatus): string {
     if (status === TaskStatus.PENDING) {
@@ -60,8 +79,90 @@ export struct TaskPage {
       if (this.filterTab === 'ALL') {
         return true;
       }
+      if (this.filterTab === 'OVERDUE') {
+        return EventService.isTaskOverdue(task);
+      }
+      if (this.filterTab === 'UNASSIGNED') {
+        return false;
+      }
       return task.status === this.filterTab;
     });
+  }
+
+  private getAssigneeName(task: Task): string {
+    const assignee: User | undefined = AccountService.getUsers().find(
+      (user: User) => user.id === task.assignee
+    );
+    return assignee === undefined ? task.assignee : assignee.name;
+  }
+
+  private getUnassignedEvents(): SecurityEvent[] {
+    return this.isAdmin() ? EventService.getUnassignedEvents() : [];
+  }
+
+  @Builder
+  unassignedEventList() {
+    if (this.getUnassignedEvents().length === 0) {
+      Column({ space: 8 }) {
+        Text('✓')
+          .fontSize(30)
+          .fontColor('#059669')
+        Text('暂无未分配事件')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#475569')
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.Center)
+    } else {
+      Scroll() {
+        Column({ space: 12 }) {
+          ForEach(this.getUnassignedEvents(), (event: SecurityEvent) => {
+            Column({ space: 8 }) {
+              Row() {
+                Text(event.id)
+                  .fontSize(10)
+                  .fontColor('#64748B')
+                Blank()
+                Text(event.priority + '优先级')
+                  .fontSize(10)
+                  .fontColor('#B45309')
+              }
+              .width('100%')
+              Text(event.title)
+                .fontSize(15)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#0F172A')
+                .width('100%')
+              Text(event.location + ' · 上报于 ' + event.reportTime)
+                .fontSize(11)
+                .fontColor('#64748B')
+                .width('100%')
+              Button('选择负责人并派单')
+                .width('100%')
+                .height(40)
+                .borderRadius(12)
+                .backgroundColor('#2563EB')
+                .fontColor(Color.White)
+                .onClick(() => {
+                  EventService.setSelectedEventId(event.id);
+                  this.pageStack.pushPath({ name: 'EventDetailPage' });
+                })
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(16)
+            .backgroundColor(Color.White)
+            .border({ width: 1, color: '#E2E8F0' })
+          }, (event: SecurityEvent) => event.id)
+        }
+        .width('100%')
+        .padding(12)
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+    }
   }
 
   private refreshTasks(): void {
@@ -72,8 +173,101 @@ export struct TaskPage {
     return PermissionService.can(AccountService.getCurrentUser(), permission);
   }
 
+  private selectTaskEvidence(task: Task, isBefore: boolean): void {
+    const context: common.Context = getContext(this) as common.Context;
+    AttachmentService.selectEvidence(context).then((paths: string[]) => {
+      if (paths.length === 0) {
+        return;
+      }
+      const previous: string[] = isBefore ? (task.beforeAttachmentPaths ?? []) :
+        (task.afterAttachmentPaths ?? []);
+      const beforePaths: string[] = isBefore ? paths : (task.beforeAttachmentPaths ?? []).slice();
+      const afterPaths: string[] = isBefore ? (task.afterAttachmentPaths ?? []).slice() : paths;
+      if (EventService.updateTaskEvidence(task.id, beforePaths, afterPaths)) {
+        previous.forEach((path: string) => AttachmentService.remove(path));
+        this.refreshTasks();
+      } else {
+        paths.forEach((path: string) => AttachmentService.remove(path));
+        promptAction.showToast({ message: '当前任务状态无法更新证据' });
+      }
+    }).catch((error: Error) => {
+      promptAction.showToast({ message: '处置证据选择失败：' + error.message });
+    });
+  }
+
+  private removeTaskEvidence(task: Task, path: string, isBefore: boolean): void {
+    const beforePaths: string[] = (task.beforeAttachmentPaths ?? []).filter(
+      (item: string) => !isBefore || item !== path
+    );
+    const afterPaths: string[] = (task.afterAttachmentPaths ?? []).filter(
+      (item: string) => isBefore || item !== path
+    );
+    if (EventService.updateTaskEvidence(task.id, beforePaths, afterPaths)) {
+      AttachmentService.remove(path);
+      this.refreshTasks();
+    }
+  }
+
+  @Builder
+  evidenceBlock(task: Task, label: string, paths: string[], isBefore: boolean, editable: boolean) {
+    Column({ space: 8 }) {
+      Row() {
+        Text(label)
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#475569')
+        Blank()
+        Text(paths.length.toString() + ' 张')
+          .fontSize(10)
+          .fontColor('#64748B')
+      }
+      .width('100%')
+
+      if (paths.length > 0) {
+        Row({ space: 8 }) {
+          ForEach(paths, (path: string) => {
+            Column({ space: 4 }) {
+              Image('file://' + path)
+                .width(72)
+                .height(72)
+                .borderRadius(10)
+                .objectFit(ImageFit.Cover)
+              if (editable) {
+                Text('移除')
+                  .fontSize(9)
+                  .fontColor('#DC2626')
+                  .onClick(() => this.removeTaskEvidence(task, path, isBefore))
+              }
+            }
+          }, (path: string) => path)
+        }
+        .width('100%')
+      }
+
+      if (editable) {
+        Button(paths.length === 0 ? '选择图片' : '重新选择')
+          .width('100%')
+          .height(36)
+          .borderRadius(10)
+          .backgroundColor('#EFF6FF')
+          .fontColor('#2563EB')
+          .fontSize(11)
+          .onClick(() => this.selectTaskEvidence(task, isBefore))
+      }
+    }
+    .width('100%')
+    .padding(10)
+    .borderRadius(12)
+    .backgroundColor('#F8FAFC')
+    .border({ width: 1, color: '#E2E8F0' })
+  }
+
   private confirmSubmit(task: Task): void {
     if (this.resultText.trim() === '') {
+      return;
+    }
+    if ((task.afterAttachmentPaths ?? []).length === 0) {
+      promptAction.showToast({ message: '请至少添加一张处置后证据' });
       return;
     }
     AlertDialog.show({
@@ -138,7 +332,7 @@ export struct TaskPage {
 
       // 状态分类切换
       Row({ space: 6 }) {
-        ForEach(this.filters, (item: TaskFilter) => {
+        ForEach(this.getFilters(), (item: TaskFilter) => {
           Text(item.label)
             .fontSize(11)
             .fontWeight(this.filterTab === item.id ? FontWeight.Bold : FontWeight.Normal)
@@ -159,7 +353,9 @@ export struct TaskPage {
       .border({ width: { bottom: 1 }, color: '#E2E8F0' })
 
       // 任务列表
-      if (this.getFilteredTasks().length === 0) {
+      if (this.filterTab === 'UNASSIGNED' && this.isAdmin()) {
+        this.unassignedEventList()
+      } else if (this.getFilteredTasks().length === 0) {
         Column({ space: 8 }) {
           Text('○')
             .fontSize(34)
@@ -229,7 +425,7 @@ export struct TaskPage {
                       .fontSize(11)
                       .fontColor('#94A3B8')
                       .layoutWeight(1)
-                    Text(task.assignee)
+                    Text(this.getAssigneeName(task))
                       .fontSize(11)
                       .fontColor('#334155')
                   }
@@ -245,6 +441,44 @@ export struct TaskPage {
                       .fontColor('#475569')
                   }
                   .width('100%')
+
+                  Row() {
+                    Text('下发时间：')
+                      .fontSize(11)
+                      .fontColor('#94A3B8')
+                      .layoutWeight(1)
+                    Text(task.createTime)
+                      .fontSize(11)
+                      .fontColor('#334155')
+                  }
+                  .width('100%')
+
+                  if (task.acceptedTime !== undefined) {
+                    Row() {
+                      Text('接单时间：')
+                        .fontSize(11)
+                        .fontColor('#94A3B8')
+                        .layoutWeight(1)
+                      Text(task.acceptedTime)
+                        .fontSize(11)
+                        .fontColor('#334155')
+                    }
+                    .width('100%')
+                  }
+
+                  if (task.deadline !== undefined) {
+                    Row() {
+                      Text('处理期限：')
+                        .fontSize(11)
+                        .fontColor('#94A3B8')
+                        .layoutWeight(1)
+                      Text(task.deadline + (EventService.isTaskOverdue(task) ? ' · 已超时' : ''))
+                        .fontSize(11)
+                        .fontWeight(EventService.isTaskOverdue(task) ? FontWeight.Bold : FontWeight.Normal)
+                        .fontColor(EventService.isTaskOverdue(task) ? '#DC2626' : '#334155')
+                    }
+                    .width('100%')
+                  }
                 }
                 .width('100%')
                 .padding(10)
@@ -258,6 +492,16 @@ export struct TaskPage {
                   .lineHeight(18)
                   .width('100%')
                   .margin({ bottom: 12 })
+
+                if (task.status !== TaskStatus.PROCESSING &&
+                  (task.beforeAttachmentPaths ?? []).length > 0) {
+                  this.evidenceBlock(task, '处置前证据', task.beforeAttachmentPaths ?? [], true, false)
+                }
+
+                if (task.status !== TaskStatus.PROCESSING &&
+                  (task.afterAttachmentPaths ?? []).length > 0) {
+                  this.evidenceBlock(task, '处置后证据', task.afterAttachmentPaths ?? [], false, false)
+                }
 
                 if (task.status === TaskStatus.PENDING && this.can(AppPermission.START_TASK)) {
                   Button('接单并开始处置')
@@ -279,6 +523,9 @@ export struct TaskPage {
 
                 if (task.status === TaskStatus.PROCESSING && this.can(AppPermission.SUBMIT_TASK)) {
                   Column({ space: 8 }) {
+                    this.evidenceBlock(task, '处置前证据', task.beforeAttachmentPaths ?? [], true, true)
+                    this.evidenceBlock(task, '处置后证据', task.afterAttachmentPaths ?? [], false, true)
+
                     TextInput({
                       placeholder: '请输入现场处置措施与结果反馈...',
                       text: this.processingTaskId === task.id ? this.resultText : task.result ?? ''
@@ -393,6 +640,7 @@ export struct TaskPage {
                     }
                   }
                   .width('100%')
+
                 }
 
                 if (task.status === TaskStatus.PROCESSING && task.rejectionReason !== undefined) {
@@ -463,6 +711,7 @@ export struct TaskPage {
     .translate({ y: this.pageReady ? 0 : 18 })
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
+      this.refreshTasks();
       this.pageReady = true;
     })
   }

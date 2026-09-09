@@ -153,10 +153,10 @@ export class EventWorkflowService {
    * @param templateIndex 模板索引 0/1/2；缺省随机
    * @returns 闭环起始事件（处理后其 status 应为 COMPLETED）
    */
-  static runFullWorkflow(templateIndex?: number): SecurityEvent {
+  static runFullWorkflow(templateIndex: number | undefined, assigneeId: string): SecurityEvent {
     const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(templateIndex);
     EventService.confirmEvent(event.id);
-    EventService.createTaskFromEvent(event.id);
+    EventService.createTaskFromEvent(event.id, assigneeId);
     const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
     if (task !== undefined) {
       EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);

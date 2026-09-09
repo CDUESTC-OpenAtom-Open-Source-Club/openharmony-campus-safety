@@ -164,7 +164,7 @@ export default function stabilityTest() {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       for (let i = 0; i < 10; i++) {
         EventService.confirmEvent(event.id);
-        EventService.createTaskFromEvent(event.id);
+        EventService.createTaskFromEvent(event.id, 'inspector_001');
       }
       const repo = EventRepository.getInstance();
       expect(repo.getAllTasks().length).assertEqual(1);
@@ -176,7 +176,7 @@ export default function stabilityTest() {
     });
 
     it('stability_repeated_complete_keeps_state_stable', 0, () => {
-      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0);
+      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0, 'inspector_001');
       const repo = EventRepository.getInstance();
       const task = repo.getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
@@ -204,7 +204,7 @@ export default function stabilityTest() {
 
       // 对批量中的第一个事件跑完整闭环
       EventService.confirmEvent(events[0].id);
-      EventService.createTaskFromEvent(events[0].id);
+      EventService.createTaskFromEvent(events[0].id, 'inspector_001');
       const task = repo.getTaskByEventId(events[0].id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {

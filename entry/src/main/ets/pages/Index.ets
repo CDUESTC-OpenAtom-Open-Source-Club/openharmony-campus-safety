@@ -137,6 +137,63 @@ struct Index {
     });
   }
 
+  private showEmergencyConfigDialog(): void {
+    AlertDialog.show({
+      title: '尚未配置有效紧急联系电话',
+      message: '请先配置 6—20 位有效电话号码。该号码仅保存在本机，不代表已接入学校或真实应急平台。',
+      primaryButton: {
+        value: '去配置',
+        action: () => {
+          this.pageStack.pushPath({ name: 'EmergencyContactPage' });
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        action: () => {
+        }
+      }
+    });
+  }
+
+  private getConfiguredEmergencyPhone(): string {
+    const phone: string = this.emergencyPhone.trim();
+    return EmergencyContactService.isValidPhone(phone) ?
+      EmergencyContactService.normalizePhone(phone) : '';
+  }
+
+  private openEmergencySms(): void {
+    const phone: string = this.getConfiguredEmergencyPhone();
+    if (phone === '') {
+      this.showEmergencyConfigDialog();
+      return;
+    }
+    const context = getContext(this) as common.UIAbilityContext;
+    const body: string = '校园安全紧急求助：请立即联系我。';
+    const want: Want = {
+      action: 'ohos.want.action.sendSms',
+      uri: 'sms:' + phone + '?body=' + encodeURIComponent(body)
+    };
+    context.startAbility(want).catch((err: Error) => {
+      promptAction.showToast({ message: '无法打开短信编辑界面，请手动联系 ' + phone });
+    });
+  }
+
+  private openEmergencyDialer(): void {
+    const phone: string = this.getConfiguredEmergencyPhone();
+    if (phone === '') {
+      this.showEmergencyConfigDialog();
+      return;
+    }
+    const context = getContext(this) as common.UIAbilityContext;
+    const want: Want = {
+      action: 'ohos.want.action.dial',
+      uri: 'tel:' + phone
+    };
+    context.startAbility(want).catch((err: Error) => {
+      promptAction.showToast({ message: '无法打开拨号界面，请手动拨打 ' + phone });
+    });
+  }
+
   onPageShow(): void {
     this.refreshEmergencyPhone();
     this.refreshSchedule();
@@ -338,10 +395,21 @@ struct Index {
   }
 
   private getHomeCourses(): Course[] {
-    const today: Course[] = this.scheduleCourses
-      .filter((course: Course) => course.weekday === 7)
-      .sort((a: Course, b: Course) => a.startPeriod - b.startPeriod);
-    return today.length > 0 ? today.slice(0, 3) : this.scheduleCourses.slice(0, 3);
+    const today: number = this.getCurrentWeekday();
+    return this.scheduleCourses
+      .filter((course: Course) => course.weekday === today)
+      .sort((a: Course, b: Course) => a.startPeriod - b.startPeriod)
+      .slice(0, 3);
+  }
+
+  private getCurrentWeekday(): number {
+    const day: number = new Date().getDay();
+    return day === 0 ? 7 : day;
+  }
+
+  private getCurrentWeekdayLabel(): string {
+    const labels: string[] = ['一', '二', '三', '四', '五', '六', '日'];
+    return '周' + labels[this.getCurrentWeekday() - 1];
   }
 
   @Builder
@@ -379,7 +447,7 @@ struct Index {
 
       Column({ space: 0 }) {
         Row() {
-          Text('今日 · 周日 · 第 3 周')
+          Text('今日 · ' + this.getCurrentWeekdayLabel())
             .fontSize(10)
             .fontWeight(FontWeight.Medium)
             .fontColor('#2563EB')
@@ -395,6 +463,15 @@ struct Index {
         }
         .width('100%')
         .margin({ bottom: 2 })
+
+        if (this.getHomeCourses().length === 0) {
+          Text('今日暂无课程，点击此处添加课程')
+            .fontSize(12)
+            .fontColor('#94A3B8')
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 18, bottom: 18 })
+        }
 
         ForEach(this.getHomeCourses(), (course: Course, index: number) => {
           this.homeCourseRow(
@@ -718,7 +795,7 @@ struct Index {
               .margin({ left: 16, right: 16 })
 
               // ========================
-              // 24H 保卫处一键求助
+              // 本地配置的应急求助
               // ========================
               Row() {
                 Column({ space: 6 }) {
@@ -758,55 +835,29 @@ struct Index {
                   this.pageStack.pushPath({ name: 'EmergencyContactPage' });
                 })
 
-                Button('一键求助')
-                  .type(ButtonType.Normal)
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#DC2626')
-                  .backgroundColor('#FEF2F2')
-                  .borderRadius(14)
-                  .height(38)
-                  .padding({ left: 14, right: 14 })
-                  .margin({ left: 10 })
-                  .onClick(() => {
-                    const phone = this.emergencyPhone.trim();
-                    if (phone === '') {
-                      AlertDialog.show({
-                        title: '尚未配置应急联系电话',
-                        message: '请先设置接收紧急通知的电话号码',
-                        primaryButton: {
-                          value: '去配置',
-                          action: () => {
-                            this.pageStack.pushPath({ name: 'EmergencyContactPage' });
-                          }
-                        },
-                        secondaryButton: {
-                          value: '取消',
-                          action: () => {
-                          }
-                        }
-                      });
-                      return;
-                    }
-                    const context = getContext(this) as common.UIAbilityContext;
-                    const body = '鸿蒙智安紧急求助：请立即联系我，谢谢。';
-                    const smsWant: Want = {
-                      action: 'ohos.want.action.sendSms',
-                      uri: 'sms:' + phone + '?body=' + encodeURIComponent(body)
-                    };
-                    const dialWant: Want = {
-                      action: 'ohos.want.action.dial',
-                      uri: 'tel:' + phone
-                    };
-                    context.startAbility(smsWant).then(() => {
-                      context.startAbility(dialWant).then(() => {
-                      }).catch((err: Error) => {
-                        promptAction.showToast({ message: '短信已打开，拨号失败，请手动拨打 ' + phone });
-                      });
-                    }).catch((err: Error) => {
-                      promptAction.showToast({ message: '无法打开短信界面，请手动联系 ' + phone });
-                    });
-                  })
+                Column({ space: 6 }) {
+                  Button('编辑短信')
+                    .type(ButtonType.Normal)
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#DC2626')
+                    .backgroundColor('#FEF2F2')
+                    .borderRadius(12)
+                    .height(34)
+                    .padding({ left: 12, right: 12 })
+                    .onClick(() => this.openEmergencySms())
+                  Button('拨打电话')
+                    .type(ButtonType.Normal)
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#B45309')
+                    .backgroundColor('#FFF7ED')
+                    .borderRadius(12)
+                    .height(34)
+                    .padding({ left: 12, right: 12 })
+                    .onClick(() => this.openEmergencyDialer())
+                }
+                .margin({ left: 10 })
               }
               .width('100%')
               .padding({ left: 14, right: 14, top: 12, bottom: 12 })
