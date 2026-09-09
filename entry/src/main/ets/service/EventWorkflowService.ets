@@ -14,6 +14,7 @@ import { EventService } from './EventService';
 import { AccountService } from './AccountService';
 import { AppPermission, PermissionService } from './PermissionService';
 import { User } from '../model/User';
+import { CampusSafetyCardService } from './CampusSafetyCardService';
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
@@ -116,6 +117,7 @@ export class EventWorkflowService {
     };
     initialRecord.eventId = event.id;
     EventRepository.getInstance().saveEvent(event);
+    CampusSafetyCardService.refreshPublishedCards();
     hilog.info(EventWorkflowService.LOG_DOMAIN, EventWorkflowService.LOG_TAG,
       'reportHazard saved: id=%{public}s title=%{public}s location=%{public}s status=%{public}s',
       event.id, event.title, event.location, event.status);
@@ -130,6 +132,7 @@ export class EventWorkflowService {
   static simulateAndEnqueue(templateIndex?: number): SecurityEvent {
     const event: SecurityEvent = EventSimulator.simulateEvent(templateIndex);
     EventRepository.getInstance().saveEvent(event);
+    CampusSafetyCardService.refreshPublishedCards();
     return event;
   }
 
@@ -144,6 +147,7 @@ export class EventWorkflowService {
       return events;
     }
     EventRepository.getInstance().saveEvents(events);
+    CampusSafetyCardService.refreshPublishedCards();
     return events;
   }
 

@@ -14,6 +14,7 @@ import { EventRepository } from '../repository/EventRepository';
 import { AccountService } from './AccountService';
 import { AppPermission, PermissionService } from './PermissionService';
 import { User, UserRole } from '../model/User';
+import { CampusSafetyCardService } from './CampusSafetyCardService';
 
 export class EventService {
   private static selectedEventId: string = '';
@@ -104,6 +105,7 @@ export class EventService {
     event.status = EventStatus.CONFIRMED;
     EventService.appendHistory(event, '确认事件', EventStatus.PENDING, EventStatus.CONFIRMED);
     EventRepository.getInstance().updateEvent(event);
+    EventService.refreshCard();
     return true;
   }
 
@@ -148,6 +150,7 @@ export class EventService {
     EventService.appendHistory(event, '指派处置任务', EventStatus.CONFIRMED, EventStatus.CONFIRMED,
       '负责人：' + (assigneeUser === undefined ? newTask.assignee : assigneeUser.name));
     EventRepository.getInstance().updateEvent(event);
+    EventService.refreshCard();
     return true;
   }
 
@@ -229,6 +232,7 @@ export class EventService {
       EventService.appendHistory(event, '接单并开始处置', EventStatus.CONFIRMED, EventStatus.PROCESSING);
       repository.updateEvent(event);
     }
+    EventService.refreshCard();
     return true;
   }
 
@@ -256,6 +260,7 @@ export class EventService {
       EventService.appendHistory(event, '提交处置结果', EventStatus.PROCESSING, EventStatus.REVIEW, trimmedResult);
       repository.updateEvent(event);
     }
+    EventService.refreshCard();
     return true;
   }
 
@@ -274,6 +279,7 @@ export class EventService {
     task.beforeAttachmentPaths = beforePaths.slice();
     task.afterAttachmentPaths = afterPaths.slice();
     repository.saveTask(task);
+    EventService.refreshCard();
     return true;
   }
 
@@ -299,6 +305,7 @@ export class EventService {
       EventService.appendHistory(event, '审核通过', EventStatus.REVIEW, EventStatus.COMPLETED);
       repository.updateEvent(event);
     }
+    EventService.refreshCard();
     return true;
   }
 
@@ -322,6 +329,7 @@ export class EventService {
       EventService.appendHistory(event, '驳回返工', EventStatus.REVIEW, EventStatus.PROCESSING, trimmedReason);
       repository.updateEvent(event);
     }
+    EventService.refreshCard();
     return true;
   }
 
@@ -374,5 +382,9 @@ export class EventService {
 
   private static ensureSeeded(): void {
     EventRepository.getInstance().seedIfEmpty(EventService.seedEvents);
+  }
+
+  private static refreshCard(): void {
+    CampusSafetyCardService.refreshPublishedCards();
   }
 }
