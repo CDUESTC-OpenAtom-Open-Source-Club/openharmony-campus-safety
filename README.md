@@ -5,8 +5,8 @@
 ![ArkUI](https://img.shields.io/badge/UI-ArkUI-0A59F7?style=flat-square)
 ![Stage](https://img.shields.io/badge/Model-Stage-success?style=flat-square)
 ![ArkUI-X](https://img.shields.io/badge/Cross--Platform-ArkUI--X-orange?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Beta-yellow?style=flat-square)
-![Version](https://img.shields.io/badge/Version-v0.1.0--beta.4-blue?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Stable-success?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v0.2.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)
 
 基于 OpenHarmony / HarmonyOS 原生 ArkUI 与 ArkTS 开发的校园安全协同应用，覆盖「发现 - 确认 - 派单 - 处理 - 反馈 - 完成」的完整安全事件闭环，并通过 ArkUI-X 支持 Android 跨平台运行。
@@ -54,7 +54,7 @@
 
 ## 当前进度
 
-`v0.1.0-beta.2` Demo 已开发完成。项目自 2026-09-08 起进入正式测试版开发，原 A/B/C 固定模块边界不再生效，后续工作按功能、里程碑、代码评审和测试责任协同推进。完整安排见 [正式测试版专业化迭代计划](docs/正式测试版专业化迭代计划.md)。
+自 `v0.1.0-beta.2` Demo 起，项目于 2026-09-08 进入正式测试版开发，原 A/B/C 固定模块边界不再生效，后续工作按功能、里程碑、代码评审和测试责任协同推进。`v0.1.0-beta.1` ~ `v0.1.0-beta.3` 完成正式测试版功能补齐，当前版本 `v0.2.0` 在此基础上完成界面重构与签名发布流程完善。完整安排见 [正式测试版专业化迭代计划](docs/正式测试版专业化迭代计划.md)。
 
 正式测试版已实现本地多角色账号、业务权限、真实任务指派、审核返工、图片证据与服务卡片。人工回归步骤与账号安全边界见 [正式测试版手动测试清单](docs/正式测试版手动测试清单.md) 和 [身份治理加固方案](docs/security-hardening/identity-governance/hardening.md)。
 
@@ -203,13 +203,13 @@ Release 产物签名步骤：
 
 | 平台 | 安装包 | 签名状态 | 说明 |
 | :--- | :--- | :--- | :--- |
-| HarmonyOS | HongMengZhiAn-v0.1.0-beta.4-HarmonyOS-signed.hap | 已签名 Release HAP | Beta 测试包 |
-| Android | HongMengZhiAn-v0.1.0-beta.4-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
+| HarmonyOS | HongMengZhiAn-v0.2.0-HarmonyOS-signed.hap | 已签名 Release HAP | 正式测试包 |
+| Android | HongMengZhiAn-v0.2.0-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
 
 发布地址：
 
 ```text
-https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.4
+https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.2.0
 ```
 
 ---
