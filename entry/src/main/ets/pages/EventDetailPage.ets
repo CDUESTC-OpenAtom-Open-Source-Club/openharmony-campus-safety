@@ -73,55 +73,25 @@ export struct EventDetailPage {
     done: boolean,
     active: boolean
   ) {
-    Column() {
-      Text(done ? '' : index.toString())
-        .fontSize(11)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(done ? Color.White : active ? Color.White : AppTheme.muted)
-    }
-    .width(26)
-    .height(26)
-    .borderRadius(13)
-    .backgroundColor(done ? AppTheme.success : active ? AppTheme.accent : AppTheme.surfaceMuted)
-    .border({ width: 1, color: done ? AppTheme.success : active ? AppTheme.accent : AppTheme.line })
-    .justifyContent(FlexAlign.Center)
-    .shadow(active ? { radius: 8, color: AppTheme.glowBlue, offsetY: 2 } : { radius: 0, color: Color.Transparent })
-
-    Text(label)
-      .fontSize(10)
-      .fontWeight(FontWeight.Medium)
-      .fontColor(done || active ? AppTheme.accent : AppTheme.muted)
-      .margin({ top: 6 })
+    Column({ space: 6 }) {
+      Text(done ? '✓' : index.toString()).fontSize(11).fontColor(done || active ? Color.White : AppTheme.muted)
+        .width(24).height(24).textAlign(TextAlign.Center).borderRadius(12)
+        .backgroundColor(done || active ? AppTheme.accent : AppTheme.surfaceMuted)
+        .border({ width: 1, color: done || active ? AppTheme.accent : AppTheme.line })
+      Text(label).fontSize(10).fontColor(done || active ? AppTheme.ink : AppTheme.muted)
+    }.width(38)
   }
 
   build() {
     Column() {
-      // 顶部标题栏
       Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor(AppTheme.inkSoft)
-          .padding({ left: 4, right: 10 })
-          .onClick(() => {
-            this.pageStack.pop();
-          })
+        Text('‹').fontSize(30).fontColor(AppTheme.ink).width(44).height(48)
+          .onClick(() => { this.pageStack.pop(); })
+        Text('事件详情').fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          .layoutWeight(1).textAlign(TextAlign.Center)
+        Blank().width(44)
+      }.width('100%').height(52).padding({ left: 16, right: 16 }).backgroundColor(AppTheme.canvas)
 
-        Column({ space: 2 }) {
-          Text('事件处置详情')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text('工单流水号：' + this.eventId)
-            .fontSize(10)
-            .fontColor(AppTheme.muted)
-        }
-        .alignItems(HorizontalAlign.Start)
-      }
-      .width('100%')
-      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
-      .backgroundColor(AppTheme.surface)
-      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       if (this.getEvent().id === '') {
         Column({ space: 10 }) {
@@ -146,12 +116,154 @@ export struct EventDetailPage {
       } else {
         Scroll() {
           Column({ space: 12 }) {
+            // 事件身份卡：深蓝结构层与铜金信息点缀。
+            Column() {
+              Row() {
+                Text(this.getEvent().type)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.accent)
+                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                  .borderRadius(4)
+                  .backgroundColor(AppTheme.accentSoft)
+
+                Blank()
+
+                Text('优先级 · ' + this.getEvent().priority)
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.amber)
+                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                  .borderRadius(4)
+                  .backgroundColor(AppTheme.amberSoft)
+              }
+              .width('100%')
+              .margin({ bottom: 10 })
+
+              Text(this.getEvent().title)
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ink)
+                .width('100%')
+
+              Text('发生区域 · ' + this.getEvent().location)
+                .fontSize(11)
+                .fontColor(AppTheme.muted)
+                .margin({ top: 6 })
+            }
+            .width('100%')
+            .padding(16)
+            .borderRadius(10)
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: 'rgba(185,220,241,0.32)' })
+            .shadow({ radius: 10, color: 'rgba(11,41,66,0.18)', offsetY: 3 })
+
+            // 核心参数卡片
+            Column({ space: 8 }) {
+              Text('事件信息')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.muted)
+                .width('100%')
+
+              Row() {
+                Text('提报人员')
+                  .fontSize(12)
+                  .fontColor(AppTheme.muted)
+                  .layoutWeight(1)
+                Text(this.getEvent().reporter)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(AppTheme.ink)
+              }
+              .width('100%')
+
+              Row() {
+                Text('登记时间')
+                  .fontSize(12)
+                  .fontColor(AppTheme.muted)
+                  .layoutWeight(1)
+                Text(this.getEvent().reportTime)
+                  .fontSize(12)
+                  .fontColor(AppTheme.inkSoft)
+              }
+              .width('100%')
+
+              Row() {
+                Text('流转状态')
+                  .fontSize(12)
+                  .fontColor(AppTheme.muted)
+                  .layoutWeight(1)
+                Text(this.isConfirmed ? EventStatus.CONFIRMED : this.getEvent().status)
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.accent)
+              }
+              .width('100%')
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(10)
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: AppTheme.line })
+
+
+            // 现场隐患描述
+            Column({ space: 6 }) {
+              Text('事件描述')
+                .fontSize(10)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.muted)
+                .width('100%')
+
+              Text(this.getEvent().description)
+                .fontSize(12)
+                .fontColor(AppTheme.ink)
+                .lineHeight(19)
+                .width('100%')
+                .padding(12)
+                .borderRadius(10)
+                .backgroundColor(AppTheme.surfaceMuted)
+            }
+            .width('100%')
+            .padding(14)
+            .borderRadius(10)
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: AppTheme.line })
+
+            // 现场附件证据
+            if ((this.getEvent().attachmentPaths ?? []).length > 0) {
+              Column({ space: 8 }) {
+                Text('现场照片')
+                  .fontSize(10)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppTheme.muted)
+                  .width('100%')
+                Row({ space: 8 }) {
+                  ForEach(this.getEvent().attachmentPaths ?? [], (path: string) => {
+                    Image('file://' + path)
+                      .width(80)
+                      .height(80)
+                      .borderRadius(10)
+                      .objectFit(ImageFit.Cover)
+                      .border({ width: 1, color: AppTheme.line })
+                  }, (path: string) => path)
+                }
+                .width('100%')
+              }
+              .width('100%')
+              .padding(14)
+              .borderRadius(10)
+              .backgroundColor(AppTheme.surface)
+              .border({ width: 1, color: AppTheme.line })
+            }
+
             // 全流程 5 节点流转轴卡片
             Column() {
               Row() {
                 Row({ space: 6 }) {
                   Row().width(4).height(12).borderRadius(2).backgroundColor(AppTheme.accent)
-                  Text('全生命周期流转进度')
+                  Text('处置流程')
                     .fontSize(13)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(AppTheme.ink)
@@ -212,157 +324,15 @@ export struct EventDetailPage {
             }
             .width('100%')
             .padding(16)
-            .borderRadius(16)
-            .backgroundColor(AppTheme.surface)
-            .border({ width: 1, color: AppTheme.line })
-            .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
-
-            // 头部详情卡片（科技蓝黑底色）
-            Column() {
-              Row() {
-                Text(this.getEvent().type)
-                  .fontSize(10)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#38BDF8')
-                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                  .borderRadius(4)
-                  .backgroundColor('rgba(56,189,248,0.18)')
-
-                Blank()
-
-                Text('优先级 · ' + this.getEvent().priority)
-                  .fontSize(10)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#FCD34D')
-                  .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                  .borderRadius(4)
-                  .backgroundColor('rgba(245,158,11,0.18)')
-              }
-              .width('100%')
-              .margin({ bottom: 10 })
-
-              Text(this.getEvent().title)
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(Color.White)
-                .width('100%')
-
-              Text('发生区域 · ' + this.getEvent().location)
-                .fontSize(11)
-                .fontColor('rgba(255,255,255,0.7)')
-                .margin({ top: 6 })
-            }
-            .width('100%')
-            .padding(16)
-            .borderRadius(16)
-            .backgroundColor(AppTheme.accentDark)
-            .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
-            .shadow({ radius: 10, color: 'rgba(11,25,44,0.16)', offsetY: 3 })
-
-            // 核心参数卡片
-            Column({ space: 8 }) {
-              Text('工单核心属性')
-                .fontSize(10)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.muted)
-                .width('100%')
-
-              Row() {
-                Text('提报人员')
-                  .fontSize(12)
-                  .fontColor(AppTheme.muted)
-                  .layoutWeight(1)
-                Text(this.getEvent().reporter)
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(AppTheme.ink)
-              }
-              .width('100%')
-
-              Row() {
-                Text('登记时间')
-                  .fontSize(12)
-                  .fontColor(AppTheme.muted)
-                  .layoutWeight(1)
-                Text(this.getEvent().reportTime)
-                  .fontSize(12)
-                  .fontColor(AppTheme.inkSoft)
-              }
-              .width('100%')
-
-              Row() {
-                Text('流转状态')
-                  .fontSize(12)
-                  .fontColor(AppTheme.muted)
-                  .layoutWeight(1)
-                Text(this.isConfirmed ? EventStatus.CONFIRMED : this.getEvent().status)
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppTheme.accent)
-              }
-              .width('100%')
-            }
-            .width('100%')
-            .padding(14)
-            .borderRadius(16)
-            .backgroundColor(AppTheme.surface)
-            .border({ width: 1, color: AppTheme.line })
-            .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
-
-            // 现场隐患描述
-            Column({ space: 6 }) {
-              Text('现场详细描述')
-                .fontSize(10)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.muted)
-                .width('100%')
-
-              Text(this.getEvent().description)
-                .fontSize(12)
-                .fontColor(AppTheme.ink)
-                .lineHeight(19)
-                .width('100%')
-                .padding(12)
-                .borderRadius(10)
-                .backgroundColor(AppTheme.surfaceMuted)
-            }
-            .width('100%')
-            .padding(14)
-            .borderRadius(16)
+            .borderRadius(10)
             .backgroundColor(AppTheme.surface)
             .border({ width: 1, color: AppTheme.line })
 
-            // 现场附件证据
-            if ((this.getEvent().attachmentPaths ?? []).length > 0) {
-              Column({ space: 8 }) {
-                Text('现场影像证据')
-                  .fontSize(10)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppTheme.muted)
-                  .width('100%')
-                Row({ space: 8 }) {
-                  ForEach(this.getEvent().attachmentPaths ?? [], (path: string) => {
-                    Image('file://' + path)
-                      .width(80)
-                      .height(80)
-                      .borderRadius(10)
-                      .objectFit(ImageFit.Cover)
-                      .border({ width: 1, color: AppTheme.line })
-                  }, (path: string) => path)
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .padding(14)
-              .borderRadius(16)
-              .backgroundColor(AppTheme.surface)
-              .border({ width: 1, color: AppTheme.line })
-            }
 
             // 操作审计历史
             if ((this.getEvent().history ?? []).length > 0) {
               Column({ space: 10 }) {
-                Text('协同流转审计日志')
+                Text('处置记录')
                   .fontSize(10)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(AppTheme.muted)
@@ -394,7 +364,7 @@ export struct EventDetailPage {
               }
               .width('100%')
               .padding(14)
-              .borderRadius(16)
+              .borderRadius(10)
               .backgroundColor(AppTheme.surface)
               .border({ width: 1, color: AppTheme.line })
             }
@@ -419,9 +389,9 @@ export struct EventDetailPage {
               }
               .width('100%')
               .padding(14)
-              .borderRadius(16)
+              .borderRadius(10)
               .backgroundColor(AppTheme.successSoft)
-              .border({ width: 1, color: '#A7F3D0' })
+              .border({ width: 1, color: AppTheme.success })
             }
 
             // 操作按钮群
@@ -489,7 +459,7 @@ export struct EventDetailPage {
                   .fontColor(Color.White)
                   .fontSize(13)
                   .fontWeight(FontWeight.Bold)
-                  .shadow({ radius: 8, color: 'rgba(2,132,199,0.25)', offsetY: 2 })
+                  .shadow({ radius: 8, color: AppTheme.glowBlue, offsetY: 2 })
                   .margin({ top: 6 })
                   .enabled(this.selectedAssigneeId !== '')
                   .opacity(this.selectedAssigneeId === '' ? 0.5 : 1)
@@ -501,7 +471,7 @@ export struct EventDetailPage {
               }
               .width('100%')
               .padding(14)
-              .borderRadius(16)
+              .borderRadius(10)
               .backgroundColor(AppTheme.surface)
               .border({ width: 1, color: AppTheme.line })
             }
@@ -531,7 +501,7 @@ export struct EventDetailPage {
               .padding(14)
               .borderRadius(14)
               .backgroundColor(AppTheme.successSoft)
-              .border({ width: 1, color: '#A7F3D0' })
+              .border({ width: 1, color: AppTheme.success })
             }
           }
           .width('100%')

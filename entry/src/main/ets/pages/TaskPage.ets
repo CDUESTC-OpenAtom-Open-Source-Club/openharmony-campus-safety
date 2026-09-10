@@ -26,6 +26,7 @@ export struct TaskPage {
   @State private pageReady: boolean = false;
   @State private tasks: Task[] = EventService.getAllTasks();
   @State private filterTab: string = 'ALL';
+  @State private expandedTaskId: string = '';
   @State private processingTaskId: string = '';
   @State private resultText: string = '';
   @State private reviewTaskId: string = '';
@@ -338,34 +339,15 @@ export struct TaskPage {
   @Builder
   taskCard(task: Task) {
     Column() {
-      Row() {
-        Text(task.id)
-          .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.accent)
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .borderRadius(8)
-          .backgroundColor(AppTheme.accentSoft)
-
-        Text(task.title)
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.ink)
-          .margin({ left: 8 })
-          .layoutWeight(1)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-        Text(task.status)
-          .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.getStatusColor(task.status))
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .borderRadius(10)
-          .backgroundColor(this.getStatusBg(task.status))
-      }
-      .width('100%')
-      .margin({ bottom: 10 })
+      Row({ space: 10 }) {
+        Image($r('app.media.ic_task')).width(28).height(28).fillColor(AppTheme.accent)
+        Column({ space: 4 }) {
+          Text(task.title).fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink).maxLines(2)
+          Text('#' + task.id).fontSize(10).fontColor(AppTheme.muted)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Text(task.status).fontSize(10).fontColor(this.getStatusColor(task.status)).padding(5).borderRadius(6)
+          .border({ width: 1, color: this.getStatusColor(task.status) })
+      }.width('100%').margin({ bottom: 12 })
 
       Column({ space: 5 }) {
         this.metaRow('处置地点', task.location, false)
@@ -384,12 +366,19 @@ export struct TaskPage {
         }
       }
       .width('100%')
-      .padding(10)
+      .padding({ top: 2, bottom: 2 })
       .borderRadius(12)
-      .backgroundColor(AppTheme.surfaceMuted)
-      .border({ width: 1, color: AppTheme.line })
+      .backgroundColor(AppTheme.surface)
+
       .margin({ bottom: 10 })
 
+      Row() {
+        Blank()
+        Button(this.expandedTaskId === task.id ? '收起' : task.status === TaskStatus.COMPLETED ? '查看结果' : '查看 / 处理')
+          .height(32).fontSize(12).fontColor(Color.White).backgroundColor(AppTheme.accent).borderRadius(16)
+          .onClick(() => { this.expandedTaskId = this.expandedTaskId === task.id ? '' : task.id; })
+      }.width('100%')
+      if (this.expandedTaskId === task.id) {
       Text(task.description)
         .fontSize(12)
         .fontColor(AppTheme.inkSoft)
@@ -408,7 +397,7 @@ export struct TaskPage {
       }
 
       if (task.status === TaskStatus.PENDING && this.can(AppPermission.START_TASK)) {
-        Button('接单并开始处置')
+        Button('去处理')
           .width('100%')
           .height(42)
           .borderRadius(12)
@@ -577,7 +566,7 @@ export struct TaskPage {
             .padding(10)
             .borderRadius(12)
             .backgroundColor(AppTheme.dangerSoft)
-            .border({ width: 1, color: '#FECACA' })
+            .border({ width: 1, color: AppTheme.danger })
             .margin({ top: 2 })
         }
         .width('100%')
@@ -608,7 +597,7 @@ export struct TaskPage {
               .padding(10)
               .borderRadius(12)
               .backgroundColor(AppTheme.successSoft)
-              .border({ width: 1, color: '#A7F3D0' })
+              .border({ width: 1, color: AppTheme.success })
               .margin({ top: 8 })
           }
 
@@ -624,10 +613,11 @@ export struct TaskPage {
         .width('100%')
         .alignItems(HorizontalAlign.Start)
       }
+      }
     }
     .width('100%')
     .padding(14)
-    .borderRadius(18)
+    .borderRadius(12)
     .backgroundColor(AppTheme.surface)
     .border({ width: 1, color: AppTheme.line })
     .shadow({ radius: 10, color: AppTheme.cardShadow, offsetY: 2 })
@@ -635,50 +625,14 @@ export struct TaskPage {
 
   build() {
     Column() {
-      // 顶部标题栏
       Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor(AppTheme.inkSoft)
-          .padding({ left: 4, right: 10 })
-          .onClick(() => {
-            this.pageStack.pop();
-          })
+        Text('‹').fontSize(30).fontColor(AppTheme.ink).width(44).height(48)
+          .onClick(() => { this.pageStack.pop(); })
+        Text('处置任务').fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          .layoutWeight(1).textAlign(TextAlign.Center)
+        Blank().width(44)
+      }.width('100%').height(52).padding({ left: 16, right: 16 }).backgroundColor(AppTheme.canvas)
 
-        Column({ space: 2 }) {
-          Text('处置任务')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text('现场工单接单与闭环反馈')
-            .fontSize(10)
-            .fontColor(AppTheme.muted)
-        }
-        .alignItems(HorizontalAlign.Start)
-
-        Blank()
-
-        Row({ space: 4 }) {
-          Row()
-            .width(6)
-            .height(6)
-            .borderRadius(3)
-            .backgroundColor(AppTheme.info)
-          Text(this.tasks.length.toString() + ' 项工单')
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.info)
-        }
-        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .borderRadius(12)
-        .backgroundColor(AppTheme.infoSoft)
-        .border({ width: 1, color: AppTheme.cyanSoft })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
-      .backgroundColor(AppTheme.surface)
-      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       // 状态分类切换
       Scroll() {
@@ -687,10 +641,10 @@ export struct TaskPage {
             Text(item.label)
               .fontSize(11)
               .fontWeight(this.filterTab === item.id ? FontWeight.Bold : FontWeight.Normal)
-              .fontColor(this.filterTab === item.id ? Color.White : AppTheme.inkSoft)
+              .fontColor(this.filterTab === item.id ? AppTheme.accent : AppTheme.inkSoft)
               .padding({ left: 12, right: 12, top: 7, bottom: 7 })
               .borderRadius(12)
-              .backgroundColor(this.filterTab === item.id ? AppTheme.accent : AppTheme.surfaceMuted)
+              .backgroundColor(this.filterTab === item.id ? AppTheme.accentSoft : AppTheme.canvas)
               .onClick(() => {
                 this.filterTab = item.id;
               })

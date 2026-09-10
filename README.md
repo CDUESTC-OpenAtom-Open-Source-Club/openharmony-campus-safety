@@ -6,7 +6,7 @@
 ![Stage](https://img.shields.io/badge/Model-Stage-success?style=flat-square)
 ![ArkUI-X](https://img.shields.io/badge/Cross--Platform-ArkUI--X-orange?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Beta-yellow?style=flat-square)
-![Version](https://img.shields.io/badge/Version-v0.1.0--beta.2-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v0.1.0--beta.4-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)
 
 基于 OpenHarmony / HarmonyOS 原生 ArkUI 与 ArkTS 开发的校园安全协同应用，覆盖「发现 - 确认 - 派单 - 处理 - 反馈 - 完成」的完整安全事件闭环，并通过 ArkUI-X 支持 Android 跨平台运行。
@@ -161,19 +161,55 @@ Debug APK 输出位置：
 .arkui-x/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Release APK 输出位置：
+
+```text
+.arkui-x/android/app/build/outputs/apk/release/app-release.apk
+```
+
+---
+
+## 发布签名
+
+签名材料、口令与 Android keystore 均保存在本地 `signing/` 目录，**不进入版本库**（见 `.gitignore`）。仓库中的构建配置不包含任何密钥或口令，因此克隆后可以直接构建未签名产物。
+
+Release 产物签名步骤：
+
+1. **HarmonyOS HAP**：先构建未签名 HAP，再用 SDK 的 `hap-sign-tool` 签名。
+
+   ```bash
+   hvigorw assembleHap --mode module -p product=default -p buildMode=release
+   ```
+
+   签名输入：`signing/OpenHarmony.p12`、`signing/OriginalAppReleaseChain.pem`、`signing/OpenHarmonyProfileRelease.p7b`（`bundle-name` 为 `com.example.hongmengzhian`）。签名命令使用 `hap-sign-tool.jar sign-app -mode localSign`，证书链必须为 3 级（叶子证书 + Application CA + Root CA）。
+
+2. **Android APK**：`.arkui-x/android/keystore.properties`（本地生成，已忽略）提供 `storeFile` / `storePassword` / `keyAlias` / `keyPassword`，`app/build.gradle` 读取后用于 release 签名；缺少该文件时回退为 debug 签名。
+
+3. **签名校验**：
+
+   ```bash
+   # HarmonyOS
+   java -jar <sdk>/toolchains/lib/hap-sign-tool.jar verify-app -inFile <hap> -outCertChain chain.cer -outProfile profile.p7b
+
+   # Android
+   apksigner verify --print-certs -v <apk>
+   ```
+
+> 发布包必须使用 release 证书签名，不得使用 debug 签名或 Android Debug 证书。
+
 ---
 
 ## 发布包
 
 | 平台 | 安装包 | 签名状态 | 说明 |
 | :--- | :--- | :--- | :--- |
-| HarmonyOS | HongMengZhiAn-v0.1.0-beta.3-HarmonyOS-signed.hap | 已签名 Release HAP | Beta 测试包 |
-| Android | HongMengZhiAn-v0.1.0-beta.3-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
+| HarmonyOS | HongMengZhiAn-v0.1.0-beta.4-HarmonyOS-signed.hap | 已签名 Release HAP | Beta 测试包 |
+| Android | HongMengZhiAn-v0.1.0-beta.4-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
 
 发布地址：
 
 ```text
-https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.3
+https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.4
 ```
 
 ---

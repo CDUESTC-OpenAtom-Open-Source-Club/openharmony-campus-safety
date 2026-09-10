@@ -32,7 +32,7 @@ export struct EventPage {
   ];
 
   private statusFilters: PriorityFilter[] = [
-    { id: 'ALL', label: '全部状态' },
+    { id: 'ALL', label: '全部' },
     { id: '待确认', label: '待确认' },
     { id: '已确认', label: '已确认' },
     { id: '处理中', label: '处理中' },
@@ -100,46 +100,14 @@ export struct EventPage {
 
   build() {
     Column() {
-      // 顶部标题栏
       Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor(AppTheme.inkSoft)
-          .padding({ left: 4, right: 10 })
-          .onClick(() => {
-            this.pageStack.pop();
-          })
+        Text('‹').fontSize(30).fontColor(AppTheme.ink).width(44).height(48)
+          .onClick(() => { this.pageStack.pop(); })
+        Text('事件中心').fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          .layoutWeight(1).textAlign(TextAlign.Center)
+        Blank().width(44)
+      }.width('100%').height(52).padding({ left: 16, right: 16 }).backgroundColor(AppTheme.canvas)
 
-        Column({ space: 2 }) {
-          Text(this.isPersonalView() ? '我的上报记录' : '安全事件流转中心')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text(this.isPersonalView() ? '全流程闭环追踪与现场核验' : '校园安全隐患汇聚、研判与派单')
-            .fontSize(10)
-            .fontColor(AppTheme.muted)
-        }
-        .alignItems(HorizontalAlign.Start)
-
-        Blank()
-
-        Row({ space: 4 }) {
-          Row().width(6).height(6).borderRadius(3).backgroundColor(AppTheme.accent)
-          Text(this.getFilteredEvents().length.toString() + ' 项记录')
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.accent)
-        }
-        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .borderRadius(12)
-        .backgroundColor(AppTheme.accentSoft)
-        .border({ width: 1, color: AppTheme.line })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
-      .backgroundColor(AppTheme.surface)
-      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       // 搜索与双层分类过滤条
       Column({ space: 10 }) {
@@ -158,6 +126,27 @@ export struct EventPage {
             this.searchQuery = value;
           })
 
+        // 状态流转筛选
+        Scroll() {
+          Row({ space: 6 }) {
+            ForEach(this.statusFilters, (item: PriorityFilter) => {
+              Text(item.label)
+                .fontSize(11)
+                .fontWeight(this.filterStatus === item.id ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(this.filterStatus === item.id ? AppTheme.accent : AppTheme.muted)
+                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                .borderRadius(8)
+                .backgroundColor(this.filterStatus === item.id ? AppTheme.accentSoft : AppTheme.canvas)
+                .onClick(() => {
+                  this.filterStatus = item.id;
+                })
+            }, (item: PriorityFilter) => item.id)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .scrollable(ScrollDirection.Horizontal)
         // 优先级筛选
         Scroll() {
           Row({ space: 6 }) {
@@ -180,27 +169,6 @@ export struct EventPage {
         .scrollBar(BarState.Off)
         .scrollable(ScrollDirection.Horizontal)
 
-        // 状态流转筛选
-        Scroll() {
-          Row({ space: 6 }) {
-            ForEach(this.statusFilters, (item: PriorityFilter) => {
-              Text(item.label)
-                .fontSize(11)
-                .fontWeight(this.filterStatus === item.id ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(this.filterStatus === item.id ? Color.White : AppTheme.muted)
-                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                .borderRadius(8)
-                .backgroundColor(this.filterStatus === item.id ? AppTheme.accentDark : AppTheme.surfaceMuted)
-                .onClick(() => {
-                  this.filterStatus = item.id;
-                })
-            }, (item: PriorityFilter) => item.id)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .scrollBar(BarState.Off)
-        .scrollable(ScrollDirection.Horizontal)
       }
       .width('100%')
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
@@ -232,96 +200,29 @@ export struct EventPage {
         Scroll() {
           Column({ space: 10 }) {
             ForEach(this.getFilteredEvents(), (event: SecurityEvent) => {
-              Column() {
-                Row() {
-                  Text(event.id)
-                    .fontSize(10)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(AppTheme.accent)
-                    .padding({ left: 7, right: 7, top: 2, bottom: 2 })
-                    .borderRadius(4)
-                    .backgroundColor(AppTheme.accentSoft)
-
-                  Text(event.title)
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(AppTheme.ink)
-                    .margin({ left: 8 })
-                    .layoutWeight(1)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                  Text(event.priority)
-                    .fontSize(10)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(this.getPriorityColor(event.priority))
-                    .padding({ left: 7, right: 7, top: 2, bottom: 2 })
-                    .borderRadius(4)
-                    .backgroundColor(this.getPriorityBg(event.priority))
-                }
-                .width('100%')
-                .margin({ bottom: 8 })
-
-                Column({ space: 5 }) {
-                  Row() {
-                    Text('发生地点')
-                      .fontSize(10)
-                      .fontColor(AppTheme.muted)
-                      .width(60)
-                    Text(event.location)
-                      .fontSize(11)
-                      .fontColor(AppTheme.inkSoft)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .layoutWeight(1)
+              Column({ space: 12 }) {
+                Row({ space: 9 }) {
+                  Text(event.priority).fontSize(12).fontColor(Color.White).fontWeight(FontWeight.Bold)
+                    .width(28).height(28).textAlign(TextAlign.Center).borderRadius(5)
+                    .backgroundColor(event.priority === EventPriority.HIGH || event.priority === EventPriority.URGENT ? AppTheme.danger : event.priority === EventPriority.MEDIUM ? AppTheme.amber : AppTheme.accent)
+                  Column({ space: 4 }) {
+                    Text(event.title).fontSize(14).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink).maxLines(2)
+                    Text('#' + event.id).fontSize(10).fontColor(AppTheme.muted).maxLines(1)
+                  }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                  Text(event.status).fontSize(10).fontColor(this.getStatusColor(event.status))
+                    .padding(5).borderRadius(6).border({ width: 1, color: this.getStatusColor(event.status) })
+                }.width('100%')
+                Row({ space: 12 }) {
+                  Column({ space: 7 }) {
+                    Text('发现时间：' + event.reportTime).fontSize(11).fontColor(AppTheme.muted)
+                    Text('地点：' + event.location).fontSize(11).fontColor(AppTheme.inkSoft).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    Text('上报人：' + event.reporter).fontSize(11).fontColor(AppTheme.muted).maxLines(1)
+                  }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                  if ((event.attachmentPaths ?? []).length > 0) {
+                    Image('file://' + (event.attachmentPaths ?? [])[0]).width(68).height(68).objectFit(ImageFit.Cover).borderRadius(8)
                   }
-                  .width('100%')
-
-                  Row() {
-                    Text('流转状态')
-                      .fontSize(10)
-                      .fontColor(AppTheme.muted)
-                      .width(60)
-                    Text(event.status)
-                      .fontSize(11)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(this.getStatusColor(event.status))
-                  }
-                  .width('100%')
-                }
-                .width('100%')
-                .padding(10)
-                .borderRadius(10)
-                .backgroundColor(AppTheme.surfaceMuted)
-                .margin({ bottom: 8 })
-
-                Text(event.description)
-                  .fontSize(12)
-                  .fontColor(AppTheme.inkSoft)
-                  .lineHeight(18)
-                  .maxLines(2)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  .width('100%')
-                  .margin({ bottom: 8 })
-
-                Row() {
-                  Text('提报人 · ' + event.reporter + '  ' + event.reportTime)
-                    .fontSize(10)
-                    .fontColor(AppTheme.muted)
-                  Blank()
-                  Text('查看详情 ›')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppTheme.accent)
-                }
-                .width('100%')
-              }
-              .width('100%')
-              .padding(14)
-              .borderRadius(16)
-              .backgroundColor(AppTheme.surface)
-              .border({ width: 1, color: AppTheme.line })
-              .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
+                }.width('100%')
+              }.width('100%').padding(14).borderRadius(12).backgroundColor(AppTheme.surface)
               .onClick(() => {
                 EventService.setSelectedEventId(event.id);
                 this.pageStack.pushPath({ name: 'EventDetailPage' });
