@@ -1,6 +1,6 @@
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
-import { Course, DEMO_COURSES } from '../model/Course';
+import { Course } from '../model/Course';
 
 /** 学生课表本地持久化服务：每个学生设备本地保存一份课表。 */
 export class ScheduleService {
@@ -14,9 +14,7 @@ export class ScheduleService {
     );
     const raw: preferences.ValueType = await pref.get(ScheduleService.KEY_COURSES, '');
     if (typeof raw !== 'string' || raw.length === 0) {
-      const initial: Course[] = DEMO_COURSES.slice();
-      await ScheduleService.saveCourses(context, initial);
-      return initial;
+      return [];
     }
     try {
       const parsed: object = JSON.parse(raw) as object;

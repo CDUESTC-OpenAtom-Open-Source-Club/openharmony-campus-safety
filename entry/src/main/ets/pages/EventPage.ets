@@ -4,6 +4,9 @@ import {
   EventStatus
 } from '../model/SecurityEvent';
 import { EventService } from '../service/EventService';
+import { AccountService } from '../service/AccountService';
+import { User, UserRole } from '../model/User';
+import { AppTheme } from '../common/AppTheme';
 
 interface PriorityFilter {
   id: string;
@@ -33,42 +36,50 @@ export struct EventPage {
     { id: '待确认', label: '待确认' },
     { id: '已确认', label: '已确认' },
     { id: '处理中', label: '处理中' },
+    { id: '待审核', label: '待审核' },
     { id: '已完成', label: '已完成' }
   ];
 
+  private isPersonalView(): boolean {
+    const user: User | null = AccountService.getCurrentUser();
+    return user?.role === UserRole.STUDENT || user?.role === UserRole.TEACHER;
+  }
+
   private getPriorityBg(priority: EventPriority): string {
     if (priority === EventPriority.URGENT) {
-      return '#FEF2F2';
+      return AppTheme.dangerSoft;
     } else if (priority === EventPriority.HIGH) {
-      return '#FFF7ED';
+      return AppTheme.amberSoft;
     } else if (priority === EventPriority.MEDIUM) {
-      return '#EFF6FF';
+      return AppTheme.infoSoft;
     }
-    return '#F1F5F9';
+    return AppTheme.surfaceMuted;
   }
 
   private getPriorityColor(priority: EventPriority): string {
     if (priority === EventPriority.URGENT) {
-      return '#DC2626';
+      return AppTheme.danger;
     } else if (priority === EventPriority.HIGH) {
-      return '#EA580C';
+      return AppTheme.amber;
     } else if (priority === EventPriority.MEDIUM) {
-      return '#2563EB';
+      return AppTheme.info;
     }
-    return '#64748B';
+    return AppTheme.muted;
   }
 
   private getStatusColor(status: EventStatus): string {
     if (status === EventStatus.PENDING) {
-      return '#B45309';
+      return AppTheme.amber;
     } else if (status === EventStatus.CONFIRMED) {
-      return '#2563EB';
+      return AppTheme.info;
     } else if (status === EventStatus.PROCESSING) {
-      return '#4F46E5';
+      return AppTheme.accent;
+    } else if (status === EventStatus.REVIEW) {
+      return AppTheme.accentDark;
     } else if (status === EventStatus.COMPLETED) {
-      return '#059669';
+      return AppTheme.success;
     }
-    return '#64748B';
+    return AppTheme.muted;
   }
 
   private getFilteredEvents(): SecurityEvent[] {
@@ -92,68 +103,72 @@ export struct EventPage {
       // 顶部标题栏
       Row() {
         Text('‹')
-          .fontSize(30)
-          .fontColor('#334155')
+          .fontSize(28)
+          .fontColor(AppTheme.inkSoft)
           .padding({ left: 4, right: 10 })
           .onClick(() => {
             this.pageStack.pop();
           })
 
-        Column() {
-          Text('安全事件')
-            .fontSize(18)
+        Column({ space: 2 }) {
+          Text(this.isPersonalView() ? '我的上报记录' : '安全事件流转中心')
+            .fontSize(17)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#0F172A')
+            .fontColor(AppTheme.ink)
 
-          Text('校园安全隐患汇聚与流转')
+          Text(this.isPersonalView() ? '全流程闭环追踪与现场核验' : '校园安全隐患汇聚、研判与派单')
             .fontSize(10)
-            .fontColor('#94A3B8')
-            .margin({ top: 2 })
+            .fontColor(AppTheme.muted)
         }
         .alignItems(HorizontalAlign.Start)
 
         Blank()
 
-        Text(this.getFilteredEvents().length.toString() + ' 项')
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#2563EB')
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(12)
-          .backgroundColor('#EFF6FF')
-          .border({ width: 1, color: '#DBEAFE' })
+        Row({ space: 4 }) {
+          Row().width(6).height(6).borderRadius(3).backgroundColor(AppTheme.accent)
+          Text(this.getFilteredEvents().length.toString() + ' 项记录')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.accent)
+        }
+        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+        .borderRadius(12)
+        .backgroundColor(AppTheme.accentSoft)
+        .border({ width: 1, color: AppTheme.line })
       }
       .width('100%')
-      .padding({ left: 12, right: 16, top: 14, bottom: 10 })
-      .backgroundColor(Color.White)
+      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
+      .backgroundColor(AppTheme.surface)
+      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
-      // 搜索与筛选
+      // 搜索与双层分类过滤条
       Column({ space: 10 }) {
         TextInput({
-          placeholder: '搜索事件名称、地点或编号...',
+          placeholder: '输入事件名称、发生地点或工单编号...',
           text: this.searchQuery
         })
           .width('100%')
           .height(40)
           .fontSize(12)
-          .borderRadius(12)
-          .backgroundColor('#F1F5F9')
-          .border({ width: 1, color: '#E2E8F0' })
+          .borderRadius(10)
+          .backgroundColor(AppTheme.surfaceMuted)
+          .border({ width: 1, color: AppTheme.line })
           .padding({ left: 12, right: 12 })
           .onChange((value: string) => {
             this.searchQuery = value;
           })
 
+        // 优先级筛选
         Scroll() {
-          Row({ space: 8 }) {
+          Row({ space: 6 }) {
             ForEach(this.filters, (item: PriorityFilter) => {
               Text(item.label)
                 .fontSize(11)
                 .fontWeight(this.filterPriority === item.id ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(this.filterPriority === item.id ? Color.White : '#64748B')
-                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .borderRadius(14)
-                .backgroundColor(this.filterPriority === item.id ? '#2563EB' : '#F1F5F9')
+                .fontColor(this.filterPriority === item.id ? Color.White : AppTheme.inkSoft)
+                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                .borderRadius(8)
+                .backgroundColor(this.filterPriority === item.id ? AppTheme.accent : AppTheme.surfaceMuted)
                 .onClick(() => {
                   this.filterPriority = item.id;
                 })
@@ -165,16 +180,17 @@ export struct EventPage {
         .scrollBar(BarState.Off)
         .scrollable(ScrollDirection.Horizontal)
 
+        // 状态流转筛选
         Scroll() {
-          Row({ space: 8 }) {
+          Row({ space: 6 }) {
             ForEach(this.statusFilters, (item: PriorityFilter) => {
               Text(item.label)
                 .fontSize(11)
                 .fontWeight(this.filterStatus === item.id ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(this.filterStatus === item.id ? Color.White : '#64748B')
-                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .borderRadius(14)
-                .backgroundColor(this.filterStatus === item.id ? '#334155' : '#F1F5F9')
+                .fontColor(this.filterStatus === item.id ? Color.White : AppTheme.muted)
+                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                .borderRadius(8)
+                .backgroundColor(this.filterStatus === item.id ? AppTheme.accentDark : AppTheme.surfaceMuted)
                 .onClick(() => {
                   this.filterStatus = item.id;
                 })
@@ -187,45 +203,49 @@ export struct EventPage {
         .scrollable(ScrollDirection.Horizontal)
       }
       .width('100%')
-      .padding({ left: 14, right: 14, top: 10, bottom: 12 })
-      .backgroundColor(Color.White)
-      .border({ width: { bottom: 1 }, color: '#E2E8F0' })
+      .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+      .backgroundColor(AppTheme.surface)
+      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
-      // 事件列表
+      // 事件列表容器
       if (this.getFilteredEvents().length === 0) {
         Column({ space: 8 }) {
-          Text('◆')
-            .fontSize(34)
-            .fontColor('#CBD5E1')
-          Text('未找到符合条件的安全事件')
+          Row() {
+            Image($r('app.media.ic_shield'))
+              .width(28).height(28).fillColor(AppTheme.muted)
+          }
+          .width(56).height(56).borderRadius(28).backgroundColor(AppTheme.surfaceMuted)
+          .justifyContent(FlexAlign.Center).margin({ bottom: 4 })
+
+          Text(this.isPersonalView() ? '暂无匹配的上报记录' : '未检索到符合条件的安全事件')
             .fontSize(14)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#475569')
-          Text('您可以调整检索词或切换优先级分类')
-            .fontSize(12)
-            .fontColor('#94A3B8')
+            .fontColor(AppTheme.inkSoft)
+          Text(this.events.length === 0 && this.isPersonalView() ? '提交现场隐患后，可在此实时跟踪处置进展' : '您可以尝试更换关键词或重置筛选维度')
+            .fontSize(11)
+            .fontColor(AppTheme.muted)
         }
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
         Scroll() {
-          Column({ space: 12 }) {
+          Column({ space: 10 }) {
             ForEach(this.getFilteredEvents(), (event: SecurityEvent) => {
               Column() {
                 Row() {
                   Text(event.id)
                     .fontSize(10)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#64748B')
-                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                    .borderRadius(8)
-                    .backgroundColor('#F1F5F9')
+                    .fontColor(AppTheme.accent)
+                    .padding({ left: 7, right: 7, top: 2, bottom: 2 })
+                    .borderRadius(4)
+                    .backgroundColor(AppTheme.accentSoft)
 
                   Text(event.title)
-                    .fontSize(15)
+                    .fontSize(14)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor('#0F172A')
+                    .fontColor(AppTheme.ink)
                     .margin({ left: 8 })
                     .layoutWeight(1)
                     .maxLines(1)
@@ -235,22 +255,22 @@ export struct EventPage {
                     .fontSize(10)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(this.getPriorityColor(event.priority))
-                    .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                    .borderRadius(10)
+                    .padding({ left: 7, right: 7, top: 2, bottom: 2 })
+                    .borderRadius(4)
                     .backgroundColor(this.getPriorityBg(event.priority))
                 }
                 .width('100%')
-                .margin({ bottom: 10 })
+                .margin({ bottom: 8 })
 
-                Column({ space: 6 }) {
+                Column({ space: 5 }) {
                   Row() {
                     Text('发生地点')
-                      .fontSize(11)
-                      .fontColor('#94A3B8')
-                      .layoutWeight(1)
+                      .fontSize(10)
+                      .fontColor(AppTheme.muted)
+                      .width(60)
                     Text(event.location)
                       .fontSize(11)
-                      .fontColor('#334155')
+                      .fontColor(AppTheme.inkSoft)
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                       .layoutWeight(1)
@@ -259,9 +279,9 @@ export struct EventPage {
 
                   Row() {
                     Text('流转状态')
-                      .fontSize(11)
-                      .fontColor('#94A3B8')
-                      .layoutWeight(1)
+                      .fontSize(10)
+                      .fontColor(AppTheme.muted)
+                      .width(60)
                     Text(event.status)
                       .fontSize(11)
                       .fontWeight(FontWeight.Bold)
@@ -271,37 +291,37 @@ export struct EventPage {
                 }
                 .width('100%')
                 .padding(10)
-                .borderRadius(12)
-                .backgroundColor('#F8FAFC')
-                .margin({ bottom: 10 })
+                .borderRadius(10)
+                .backgroundColor(AppTheme.surfaceMuted)
+                .margin({ bottom: 8 })
 
                 Text(event.description)
                   .fontSize(12)
-                  .fontColor('#475569')
+                  .fontColor(AppTheme.inkSoft)
                   .lineHeight(18)
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .width('100%')
-                  .margin({ bottom: 10 })
+                  .margin({ bottom: 8 })
 
                 Row() {
-                  Text(event.reporter)
-                    .fontSize(11)
-                    .fontColor('#94A3B8')
+                  Text('提报人 · ' + event.reporter + '  ' + event.reportTime)
+                    .fontSize(10)
+                    .fontColor(AppTheme.muted)
                   Blank()
-                  Text('处置跟踪 ›')
+                  Text('查看详情 ›')
                     .fontSize(11)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#2563EB')
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppTheme.accent)
                 }
                 .width('100%')
               }
               .width('100%')
               .padding(14)
-              .borderRadius(18)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E2E8F0' })
-              .shadow({ radius: 10, color: 'rgba(15,23,42,0.04)', offsetY: 2 })
+              .borderRadius(16)
+              .backgroundColor(AppTheme.surface)
+              .border({ width: 1, color: AppTheme.line })
+              .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
               .onClick(() => {
                 EventService.setSelectedEventId(event.id);
                 this.pageStack.pushPath({ name: 'EventDetailPage' });
@@ -318,11 +338,12 @@ export struct EventPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F8FAFC')
+    .backgroundColor(AppTheme.canvas)
     .opacity(this.pageReady ? 1 : 0)
-    .translate({ y: this.pageReady ? 0 : 18 })
+    .translate({ y: this.pageReady ? 0 : 12 })
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
+      this.events = EventService.getAllEvents().slice();
       this.pageReady = true;
     })
   }

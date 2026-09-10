@@ -2,6 +2,7 @@
 /oh_modules
 /local.properties
 /.idea
+/.vscode
 **/build
 /.hvigor
 .cxx
@@ -26,6 +27,7 @@
 /TECH_STACK.md
 /TESTING.md
 /WORKFLOW.md
+/docs/
 
 # 本地回归验证临时目录（截图/ASCII 工具，不入库）
 /.regression/

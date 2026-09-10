@@ -19,6 +19,8 @@ import { EventRepository } from '../main/ets/repository/EventRepository';
 import { EventService } from '../main/ets/service/EventService';
 
 import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN } from './TestAuthFixture';
 
 /**
  * 稳定性与重启恢复测试（C 模块 M4）
@@ -30,6 +32,7 @@ import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
 export default function stabilityTest() {
   describe('StabilityTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 
@@ -161,7 +164,7 @@ export default function stabilityTest() {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       for (let i = 0; i < 10; i++) {
         EventService.confirmEvent(event.id);
-        EventService.createTaskFromEvent(event.id);
+        EventService.createTaskFromEvent(event.id, 'inspector_001');
       }
       const repo = EventRepository.getInstance();
       expect(repo.getAllTasks().length).assertEqual(1);
@@ -173,7 +176,7 @@ export default function stabilityTest() {
     });
 
     it('stability_repeated_complete_keeps_state_stable', 0, () => {
-      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0);
+      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0, 'inspector_001');
       const repo = EventRepository.getInstance();
       const task = repo.getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
@@ -201,12 +204,13 @@ export default function stabilityTest() {
 
       // 对批量中的第一个事件跑完整闭环
       EventService.confirmEvent(events[0].id);
-      EventService.createTaskFromEvent(events[0].id);
+      EventService.createTaskFromEvent(events[0].id, 'inspector_001');
       const task = repo.getTaskByEventId(events[0].id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '批量回归处置完成');
+        EventService.approveTask(task.id);
       }
 
       expect(repo.getEvents().length).assertEqual(50);

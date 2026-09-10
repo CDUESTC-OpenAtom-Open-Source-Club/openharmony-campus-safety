@@ -19,10 +19,13 @@ import { EventRepository } from '../main/ets/repository/EventRepository';
 import { EventService } from '../main/ets/service/EventService';
 
 import { EventWorkflowService } from '../main/ets/service/EventWorkflowService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN, TEST_STUDENT } from './TestAuthFixture';
 
 export default function eventWorkflowTest() {
   describe('EventWorkflowTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 
@@ -67,7 +70,7 @@ export default function eventWorkflowTest() {
     it('workflow_state_link_task_processing_updates_event', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
@@ -80,14 +83,21 @@ export default function eventWorkflowTest() {
       }
     });
 
-    it('workflow_state_link_task_completed_updates_event', 0, () => {
+    it('workflow_submit_then_approve_updates_event', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.startTask(task.id);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        const reviewing = EventRepository.getInstance().getEventById(event.id);
+        expect(reviewing === undefined).assertFalse();
+        if (reviewing !== undefined) {
+          expect(reviewing.status).assertEqual(EventStatus.REVIEW);
+        }
+        EventService.approveTask(task.id);
         const stored = EventRepository.getInstance().getEventById(event.id);
         expect(stored === undefined).assertFalse();
         if (stored !== undefined) {
@@ -113,15 +123,20 @@ export default function eventWorkflowTest() {
         expect(afterConfirm.status).assertEqual(EventStatus.CONFIRMED);
       }
 
-      EventService.createTaskFromEvent(event.id);
+      event.reportTime = '2020-01-01 00:00:00';
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = repo.getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         expect(task.status).assertEqual(TaskStatus.PENDING);
+        expect(task.assignee).assertEqual('inspector_001');
+        expect(task.createTime === event.reportTime).assertFalse();
+        expect(task.deadline === undefined).assertFalse();
       }
 
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
+        expect(task.acceptedTime === undefined).assertFalse();
         const duringProcessing = repo.getEventById(event.id);
         expect(duringProcessing === undefined).assertFalse();
         if (duringProcessing !== undefined) {
@@ -130,7 +145,13 @@ export default function eventWorkflowTest() {
       }
 
       if (task !== undefined) {
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        const pendingReview = repo.getEventById(event.id);
+        expect(pendingReview === undefined).assertFalse();
+        if (pendingReview !== undefined) {
+          expect(pendingReview.status).assertEqual(EventStatus.REVIEW);
+        }
+        EventService.approveTask(task.id);
         const afterComplete = repo.getEventById(event.id);
         expect(afterComplete === undefined).assertFalse();
         if (afterComplete !== undefined) {
@@ -142,12 +163,13 @@ export default function eventWorkflowTest() {
     it('workflow_completed_event_no_downgrade_on_task_rollback', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const task = EventRepository.getInstance().getTaskByEventId(event.id);
       expect(task === undefined).assertFalse();
       if (task !== undefined) {
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-        EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+        EventService.submitTaskForReview(task.id, '现场处置完成');
+        EventService.approveTask(task.id);
         // 已完成任务被要求回退到处理中：任务与事件状态均保持不变
         EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
         const storedTask = EventRepository.getInstance().getTaskByEventId(event.id);
@@ -163,19 +185,80 @@ export default function eventWorkflowTest() {
       }
     });
 
+    it('workflow_admin_can_find_unassigned_and_overdue_work', 0, () => {
+      const unassigned: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.confirmEvent(unassigned.id)).assertTrue();
+      expect(EventService.getUnassignedEvents().length).assertEqual(1);
+      expect(EventService.createTaskFromEvent(unassigned.id, '')).assertFalse();
+      expect(EventService.createTaskFromEvent(unassigned.id, 'unknown_inspector')).assertFalse();
+      expect(EventService.createTaskFromEvent(unassigned.id, 'inspector_001')).assertTrue();
+      expect(EventService.getUnassignedEvents().length).assertEqual(0);
+      const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(unassigned.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        task.deadline = '2020-01-01 00:00:00';
+        expect(EventService.isTaskOverdue(task)).assertTrue();
+        task.status = TaskStatus.COMPLETED;
+        expect(EventService.isTaskOverdue(task)).assertFalse();
+      }
+    });
+
+    it('workflow_review_rejection_returns_to_processing', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      EventService.confirmEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
+      const repo = EventRepository.getInstance();
+      const task = repo.getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.submitTaskForReview(task.id, '已清理现场')).assertTrue();
+        expect(EventService.rejectTask(task.id, '缺少复测说明')).assertTrue();
+        const rejectedTask = repo.getTaskByEventId(event.id);
+        expect(rejectedTask === undefined).assertFalse();
+        if (rejectedTask !== undefined) {
+          expect(rejectedTask.status).assertEqual(TaskStatus.PROCESSING);
+          expect(rejectedTask.rejectionReason).assertEqual('缺少复测说明');
+        }
+        const rejectedEvent = repo.getEventById(event.id);
+        expect(rejectedEvent === undefined).assertFalse();
+        if (rejectedEvent !== undefined) {
+          expect(rejectedEvent.status).assertEqual(EventStatus.PROCESSING);
+        }
+      }
+    });
+
+    it('workflow_invalid_and_duplicate_transitions_are_rejected', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertFalse();
+      expect(EventService.confirmEvent(event.id)).assertTrue();
+      expect(EventService.confirmEvent(event.id)).assertFalse();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertFalse();
+      const task = EventRepository.getInstance().getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.submitTaskForReview(task.id, '尚未接单')).assertFalse();
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.startTask(task.id)).assertFalse();
+        expect(EventService.submitTaskForReview(task.id, '   ')).assertFalse();
+        expect(EventService.approveTask(task.id)).assertFalse();
+      }
+    });
+
     it('workflow_duplicate_confirm_and_dispatch_protected', 0, () => {
       const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       EventService.confirmEvent(event.id);
-      EventService.createTaskFromEvent(event.id);
+      EventService.createTaskFromEvent(event.id, 'inspector_001');
       const repo = EventRepository.getInstance();
       expect(repo.getAllTasks().length).assertEqual(1);
       expect(repo.getTaskByEventId(event.id) === undefined).assertFalse();
     });
 
     it('workflow_run_full_loop_reaches_completed', 0, () => {
-      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0);
+      const event: SecurityEvent = EventWorkflowService.runFullWorkflow(0, 'inspector_001');
       const repo = EventRepository.getInstance();
       const stored = repo.getEventById(event.id);
       expect(stored === undefined).assertFalse();
@@ -190,6 +273,7 @@ export default function eventWorkflowTest() {
     });
 
     it('workflow_report_hazard_saves_pending_event', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
       const repo = EventRepository.getInstance();
       const before: number = repo.getEvents().length;
       const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
@@ -205,12 +289,63 @@ export default function eventWorkflowTest() {
         expect(event.status).assertEqual(EventStatus.PENDING);
         expect(event.type).assertEqual(EventType.FACILITY);
         expect(event.location).assertEqual('教学楼2层东侧');
-        expect(event.reporter).assertEqual('张三');
+        expect(event.reporter).assertEqual(TEST_STUDENT.name);
+        expect(event.reporterId).assertEqual(TEST_STUDENT.id);
+        expect((event.history ?? []).length).assertEqual(1);
+        expect((event.history ?? [])[0].action).assertEqual('提交隐患上报');
+        expect((event.history ?? [])[0].operatorId).assertEqual(TEST_STUDENT.id);
         expect(repo.getEventById(event.id) === undefined).assertFalse();
       }
     });
 
+    it('workflow_report_hazard_keeps_attachment_paths', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
+      const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
+        title: '现场图片上报',
+        type: EventType.FACILITY,
+        location: '实验楼一层',
+        description: '配电箱外壳破损',
+        attachmentPaths: ['/data/storage/el2/base/files/evidence/evidence_1.jpg']
+      });
+      expect(event === undefined).assertFalse();
+      if (event !== undefined) {
+        expect((event.attachmentPaths ?? []).length).assertEqual(1);
+        expect((event.attachmentPaths ?? [])[0]).assertEqual(
+          '/data/storage/el2/base/files/evidence/evidence_1.jpg'
+        );
+      }
+    });
+
+    it('workflow_full_loop_records_audit_history', 0, () => {
+      const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(0);
+      expect(EventService.confirmEvent(event.id)).assertTrue();
+      expect(EventService.createTaskFromEvent(event.id, 'inspector_001')).assertTrue();
+      const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
+      expect(task === undefined).assertFalse();
+      if (task !== undefined) {
+        expect(EventService.startTask(task.id)).assertTrue();
+        expect(EventService.updateTaskEvidence(task.id,
+          ['/data/storage/el2/base/files/evidence/before.jpg'],
+          ['/data/storage/el2/base/files/evidence/after.jpg'])).assertTrue();
+        expect(EventService.submitTaskForReview(task.id, '已完成处置')).assertTrue();
+        expect(EventService.approveTask(task.id)).assertTrue();
+      }
+      const stored: SecurityEvent | undefined = EventRepository.getInstance().getEventById(event.id);
+      expect(stored === undefined).assertFalse();
+      if (stored !== undefined) {
+        expect((stored.history ?? []).length).assertEqual(5);
+        expect((stored.history ?? [])[0].action).assertEqual('确认事件');
+        expect((stored.history ?? [])[4].action).assertEqual('审核通过');
+        expect((stored.history ?? [])[4].toStatus).assertEqual(EventStatus.COMPLETED);
+      }
+      if (task !== undefined) {
+        expect((task.beforeAttachmentPaths ?? []).length).assertEqual(1);
+        expect((task.afterAttachmentPaths ?? []).length).assertEqual(1);
+      }
+    });
+
     it('workflow_report_hazard_trims_and_applies_defaults', 0, () => {
+      AccountService.setCurrentUserForTest(TEST_STUDENT);
       const event: SecurityEvent | undefined = EventWorkflowService.reportHazard({
         title: '  楼道应急灯破损  ',
         type: EventType.FACILITY,
@@ -222,7 +357,8 @@ export default function eventWorkflowTest() {
       if (event !== undefined) {
         expect(event.title).assertEqual('楼道应急灯破损');
         expect(event.location).assertEqual('教学楼2层东侧');
-        expect(event.reporter).assertEqual('学生上报');
+        expect(event.reporter).assertEqual(TEST_STUDENT.name);
+        expect(event.reporterId).assertEqual(TEST_STUDENT.id);
         expect(event.priority).assertEqual(EventPriority.MEDIUM);
       }
     });

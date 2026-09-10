@@ -31,6 +31,21 @@
           }
         ]
       }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "CampusSafetyFormAbility",
+        "srcEntry": "./ets/formability/CampusSafetyFormAbility.ets",
+        "label": "$string:CampusSafetyCard_display_name",
+        "description": "$string:CampusSafetyCard_desc",
+        "type": "form",
+        "metadata": [
+          {
+            "name": "ohos.extension.form",
+            "resource": "$profile:campus_safety_form_config"
+          }
+        ]
+      }
     ]
   }
 }

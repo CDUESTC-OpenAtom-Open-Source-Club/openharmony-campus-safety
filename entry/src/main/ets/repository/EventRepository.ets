@@ -73,10 +73,13 @@ export class EventRepository {
           location: seed.location,
           description: seed.description,
           reporter: seed.reporter,
+          reporterId: seed.reporterId,
           reportTime: seed.reportTime,
           status: seed.status,
           priority: seed.priority,
-          handler: seed.handler
+          handler: seed.handler,
+          attachmentPaths: seed.attachmentPaths,
+          history: seed.history
         };
         return clone;
       });

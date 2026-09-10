@@ -2,7 +2,8 @@ import {
   SecurityEvent,
   EventStatus,
   EventPriority,
-  EventType
+  EventType,
+  OperationRecord
 } from '../model/SecurityEvent';
 
 import { Task, TaskStatus } from '../model/Task';
@@ -10,6 +11,10 @@ import { Task, TaskStatus } from '../model/Task';
 import { EventSimulator } from '../simulator/EventSimulator';
 import { EventRepository } from '../repository/EventRepository';
 import { EventService } from './EventService';
+import { AccountService } from './AccountService';
+import { AppPermission, PermissionService } from './PermissionService';
+import { User } from '../model/User';
+import { CampusSafetyCardService } from './CampusSafetyCardService';
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
@@ -24,6 +29,7 @@ export interface HazardReport {
   description: string;
   reporter?: string;
   priority?: EventPriority;
+  attachmentPaths?: string[];
 }
 
 /**
@@ -70,6 +76,10 @@ export class EventWorkflowService {
    * @returns 落库后的 SecurityEvent（status 为 PENDING，等待确认）；必填项缺失时返回 undefined
    */
   static reportHazard(input: HazardReport): SecurityEvent | undefined {
+    const currentUser: User | null = AccountService.getCurrentUser();
+    if (!PermissionService.can(currentUser, AppPermission.REPORT_HAZARD)) {
+      return undefined;
+    }
     if (input.title === undefined || input.title.trim() === '' ||
       input.location === undefined || input.location.trim() === '' ||
       input.description === undefined || input.description.trim() === '') {
@@ -81,18 +91,33 @@ export class EventWorkflowService {
       ? EventWorkflowService.buildSummaryTitle(input.description)
       : trimmedTitle;
     const now: Date = new Date();
+    const reportTime: string = EventSimulator.formatReportTime(now);
+    const initialRecord: OperationRecord = {
+      id: 'AUDIT-' + now.getTime().toString(),
+      eventId: '',
+      operatorId: currentUser === null ? '' : currentUser.id,
+      operatorName: currentUser === null ? '本地用户' : currentUser.name,
+      action: '提交隐患上报',
+      operationTime: reportTime,
+      toStatus: EventStatus.PENDING
+    };
     const event: SecurityEvent = {
       id: EventSimulator.generateEventId(),
       title: finalTitle,
       type: input.type,
       location: input.location.trim(),
       description: input.description.trim(),
-      reporter: input.reporter === undefined || input.reporter.trim() === '' ? '学生上报' : input.reporter.trim(),
-      reportTime: EventSimulator.formatReportTime(now),
+      reporter: currentUser === null ? '本地用户' : currentUser.name,
+      reporterId: currentUser === null ? undefined : currentUser.id,
+      reportTime: reportTime,
       status: EventStatus.PENDING,
-      priority: input.priority === undefined ? EventPriority.MEDIUM : input.priority
+      priority: input.priority === undefined ? EventPriority.MEDIUM : input.priority,
+      attachmentPaths: input.attachmentPaths,
+      history: [initialRecord]
     };
+    initialRecord.eventId = event.id;
     EventRepository.getInstance().saveEvent(event);
+    CampusSafetyCardService.refreshPublishedCards();
     hilog.info(EventWorkflowService.LOG_DOMAIN, EventWorkflowService.LOG_TAG,
       'reportHazard saved: id=%{public}s title=%{public}s location=%{public}s status=%{public}s',
       event.id, event.title, event.location, event.status);
@@ -107,6 +132,7 @@ export class EventWorkflowService {
   static simulateAndEnqueue(templateIndex?: number): SecurityEvent {
     const event: SecurityEvent = EventSimulator.simulateEvent(templateIndex);
     EventRepository.getInstance().saveEvent(event);
+    CampusSafetyCardService.refreshPublishedCards();
     return event;
   }
 
@@ -121,6 +147,7 @@ export class EventWorkflowService {
       return events;
     }
     EventRepository.getInstance().saveEvents(events);
+    CampusSafetyCardService.refreshPublishedCards();
     return events;
   }
 
@@ -130,14 +157,15 @@ export class EventWorkflowService {
    * @param templateIndex 模板索引 0/1/2；缺省随机
    * @returns 闭环起始事件（处理后其 status 应为 COMPLETED）
    */
-  static runFullWorkflow(templateIndex?: number): SecurityEvent {
+  static runFullWorkflow(templateIndex: number | undefined, assigneeId: string): SecurityEvent {
     const event: SecurityEvent = EventWorkflowService.simulateAndEnqueue(templateIndex);
     EventService.confirmEvent(event.id);
-    EventService.createTaskFromEvent(event.id);
+    EventService.createTaskFromEvent(event.id, assigneeId);
     const task: Task | undefined = EventRepository.getInstance().getTaskByEventId(event.id);
     if (task !== undefined) {
       EventService.updateTaskStatus(task.id, TaskStatus.PROCESSING);
-      EventService.updateTaskStatus(task.id, TaskStatus.COMPLETED);
+      EventService.submitTaskForReview(task.id, '演示处置完成，现场复核正常');
+      EventService.approveTask(task.id);
     }
     return event;
   }

@@ -17,6 +17,8 @@ import { MemoryEventStore } from '../main/ets/repository/store/MemoryEventStore'
 import { EventRepository } from '../main/ets/repository/EventRepository';
 
 import { EventService } from '../main/ets/service/EventService';
+import { AccountService } from '../main/ets/service/AccountService';
+import { TEST_ADMIN } from './TestAuthFixture';
 
 function buildEvent(id: string): SecurityEvent {
   return {
@@ -48,6 +50,7 @@ function buildTask(id: string, eventId: string): Task {
 export default function eventRepositoryTest() {
   describe('EventRepositoryTest', () => {
     beforeEach(() => {
+      AccountService.setCurrentUserForTest(TEST_ADMIN);
       EventRepository.initForTest(new MemoryEventStore());
     });
 
@@ -74,6 +77,61 @@ export default function eventRepositoryTest() {
       const tasks: Task[] = await store.loadTasks();
       expect(tasks.length).assertEqual(1);
       expect(tasks[0].eventId).assertEqual('E1');
+    });
+
+    it('completed_task_result_survives_repository_reload', 0, async () => {
+      const store = new MemoryEventStore();
+      const firstRepository = EventRepository.initForTest(store);
+      const completedTask: Task = buildTask('TASK001', 'E1');
+      completedTask.status = TaskStatus.COMPLETED;
+      completedTask.result = '已更换损坏的应急灯并复测正常';
+      completedTask.completedTime = '2026-09-08 14:30:00';
+      completedTask.acceptedTime = '2026-09-08 13:30:00';
+      completedTask.deadline = '2026-09-08 18:00:00';
+      completedTask.beforeAttachmentPaths = ['/data/storage/el2/base/files/evidence/before.jpg'];
+      completedTask.afterAttachmentPaths = ['/data/storage/el2/base/files/evidence/after.jpg'];
+      firstRepository.saveTask(completedTask);
+
+      // 重新创建 Repository 并从同一持久化后端加载，模拟应用重启。
+      const reloadedRepository = EventRepository.initForTest(store);
+      await reloadedRepository.load();
+      const tasks: Task[] = reloadedRepository.getAllTasks();
+      expect(tasks.length).assertEqual(1);
+      expect(tasks[0].status).assertEqual(TaskStatus.COMPLETED);
+      expect(tasks[0].result).assertEqual('已更换损坏的应急灯并复测正常');
+      expect(tasks[0].completedTime).assertEqual('2026-09-08 14:30:00');
+      expect(tasks[0].acceptedTime).assertEqual('2026-09-08 13:30:00');
+      expect(tasks[0].deadline).assertEqual('2026-09-08 18:00:00');
+      expect((tasks[0].beforeAttachmentPaths ?? []).length).assertEqual(1);
+      expect((tasks[0].afterAttachmentPaths ?? []).length).assertEqual(1);
+    });
+
+    it('event_evidence_and_history_survive_repository_reload', 0, async () => {
+      const store = new MemoryEventStore();
+      const firstRepository = EventRepository.initForTest(store);
+      const event: SecurityEvent = buildEvent('EVIDENCE001');
+      event.attachmentPaths = ['/data/storage/el2/base/files/evidence/site.jpg'];
+      event.history = [{
+        id: 'AUDIT-1',
+        eventId: event.id,
+        operatorId: TEST_ADMIN.id,
+        operatorName: TEST_ADMIN.name,
+        action: '确认事件',
+        operationTime: '2026-09-09 09:00:00',
+        fromStatus: EventStatus.PENDING,
+        toStatus: EventStatus.CONFIRMED
+      }];
+      firstRepository.saveEvent(event);
+
+      const reloadedRepository = EventRepository.initForTest(store);
+      await reloadedRepository.load();
+      const reloaded: SecurityEvent | undefined = reloadedRepository.getEventById(event.id);
+      expect(reloaded === undefined).assertFalse();
+      if (reloaded !== undefined) {
+        expect((reloaded.attachmentPaths ?? []).length).assertEqual(1);
+        expect((reloaded.history ?? []).length).assertEqual(1);
+        expect((reloaded.history ?? [])[0].action).assertEqual('确认事件');
+      }
     });
 
     it('repository_save_event_then_get', 0, () => {
@@ -188,10 +246,10 @@ export default function eventRepositoryTest() {
     it('event_service_create_task_and_deduplicate', 0, () => {
       const repo = EventRepository.getInstance();
       repo.saveEvent(buildEvent('EVT003'));
-      EventService.createTaskFromEvent('EVT003');
+      EventService.createTaskFromEvent('EVT003', 'inspector_001');
       expect(EventService.getAllTasks().length).assertEqual(1);
       expect(EventService.getAllTasks()[0].eventId).assertEqual('EVT003');
-      EventService.createTaskFromEvent('EVT003');
+      EventService.createTaskFromEvent('EVT003', 'inspector_001');
       expect(EventService.getAllTasks().length).assertEqual(1);
     });
 
@@ -209,7 +267,7 @@ export default function eventRepositoryTest() {
 
     it('event_service_get_my_task_list', 0, () => {
       EventRepository.getInstance().saveEvent(buildEvent('EVT003'));
-      EventService.createTaskFromEvent('EVT003');
+      EventService.createTaskFromEvent('EVT003', 'inspector_001');
       const myTasks = EventService.getMyTaskList('inspector_001');
       expect(myTasks.length).assertEqual(1);
       expect(myTasks[0].eventId).assertEqual('EVT003');
@@ -219,7 +277,7 @@ export default function eventRepositoryTest() {
 
     it('event_service_update_task_status', 0, () => {
       EventRepository.getInstance().saveEvent(buildEvent('EVT003'));
-      EventService.createTaskFromEvent('EVT003');
+      EventService.createTaskFromEvent('EVT003', 'inspector_001');
       const tasks = EventService.getAllTasks();
       expect(tasks.length).assertEqual(1);
       const taskId = tasks[0].id;

@@ -30,7 +30,8 @@
 | 原生鸿蒙实现 | ArkTS + ArkUI，Stage 模型，Navigation 导航 |
 | 完整业务闭环 | 事件从产生到归档全程可追踪 |
 | 数据本地持久化 | ArkData relationalStore + Preferences，重启不丢失 |
-| 实时数据统计 | 健康度、达标率、趋势图均根据真实业务数据计算 |
+| 实时数据统计 | 事件、任务、首次响应、处置时长与按期完成率均根据真实本地数据计算；空数据明确标识 |
+| 鸿蒙服务卡片 | 基于 Form Kit，按当前角色展示本地上报、任务或待审核数据，并在业务状态变化后刷新 |
 | 应急求助能力 | 配置紧急联系电话后，可一键打开短信与拨号界面 |
 | 纯净上架状态 | 不预置演示数据，首次启动即为空状态 |
 | 跨平台支持 | 通过 ArkUI-X 打包为 Android APK |
@@ -46,12 +47,20 @@
 | 隐患上报 | 多类型隐患、地点与描述、优先级选择、一键提交进入事件流 |
 | 数据统计 | 实时健康度、事件与任务指标、领域达标率、近 7 日趋势 |
 | 应急联系方式 | 独立配置页，保存紧急联系电话 |
-| 一键求助 | 打开短信界面预填号码与内容，并打开拨号界面 |
+| 一键求助 | 分别打开系统短信编辑或拨号界面，均由用户确认后执行 |
 | 应用体验 | 开屏动画、页面切换动效、统一品牌视觉 |
 
 ---
 
 ## 当前进度
+
+`v0.1.0-beta.2` Demo 已开发完成。项目自 2026-09-08 起进入正式测试版开发，原 A/B/C 固定模块边界不再生效，后续工作按功能、里程碑、代码评审和测试责任协同推进。完整安排见 [正式测试版专业化迭代计划](docs/正式测试版专业化迭代计划.md)。
+
+正式测试版已实现本地多角色账号、业务权限、真实任务指派、审核返工、图片证据与服务卡片。人工回归步骤与账号安全边界见 [正式测试版手动测试清单](docs/正式测试版手动测试清单.md) 和 [身份治理加固方案](docs/security-hardening/identity-governance/hardening.md)。
+
+M7 业务深化已完成四个阶段：上报页接入系统图片选择与应用私有目录保存，事件详情可查看现场证据和操作历史；普通用户可在“我的上报”中跟踪进度与最终反馈；巡检人员可提交处置前后图片；管理员可按本地安保账号真实派单并查看未分配、超时和待审核任务，任务责任时间随业务状态持久化。
+
+M8 已完成 HarmonyOS 原生校园安全服务卡片；M9 已完成真实统计口径与产品可信文案清理。M10 正在进行构建、测试与云手机集成验收，未验证能力不会作为已发布能力声明。
 
 | 阶段 | 模块 | 状态 | 说明 |
 | :---: | :--- | :---: | :--- |
@@ -63,7 +72,7 @@
 | 6 | 应急联系方式与一键求助 | 完成 | 配置页、短信预填、拨号调用 |
 | 7 | 开屏与切换动效 | 完成 | 开屏动画、页面淡入动效 |
 | 8 | Android 跨平台 | 完成 | ArkUI-X 打包与真机安装验证 |
-| 9 | 签名与发布 | 完成 | HAP 与 APK 签名，Beta Release 已发布 |
+| 9 | 签名与发布 | 历史 Demo | 旧 Beta Release 仅作历史记录，当前正式测试版需重新完成签名与云手机验收 |
 | 10 | 学生课表 | 完成 | 校内课程表网格、课次切换与本地偏好存储 |
 
 ---
@@ -158,13 +167,13 @@ Debug APK 输出位置：
 
 | 平台 | 安装包 | 签名状态 | 说明 |
 | :--- | :--- | :--- | :--- |
-| HarmonyOS | `HongMengZhiAn-v0.1.0-beta.2-HarmonyOS-signed.hap` | 已签名 | Beta 测试版 |
-| Android | `HongMengZhiAn-v0.1.0-beta.2-Android.apk` | 已签名 | Beta 测试版 |
+| HarmonyOS | HongMengZhiAn-v0.1.0-beta.3-HarmonyOS-signed.hap | 已签名 Release HAP | Beta 测试包 |
+| Android | HongMengZhiAn-v0.1.0-beta.3-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
 
 发布地址：
 
 ```text
-https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.2
+https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v0.1.0-beta.3
 ```
 
 ---
@@ -182,12 +191,13 @@ https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/r
 
 ---
 
-## 后续计划
+## 已知限制与后续计划
 
 - 接入校园真实保卫处值班号码配置
 - 增加事件图片上传与现场证据留存
 - 完善权限申请与合规说明
-- 正式签名发布 `v1.0.0` 稳定版
+- 完成正式签名、HarmonyOS 云手机全量回归后发布稳定版
+- 云端协同、校园统一身份认证、分布式软总线与物联网接入不属于当前已实现能力
 
 ---
 

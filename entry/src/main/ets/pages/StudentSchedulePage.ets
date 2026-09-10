@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { Course, CourseColor } from '../model/Course';
 import { ScheduleService } from '../service/ScheduleService';
+import { AppTheme } from '../common/AppTheme';
 
 @Component
 export struct StudentSchedulePage {
@@ -38,6 +39,11 @@ export struct StudentSchedulePage {
 
   private async persist(): Promise<void> {
     await ScheduleService.saveCourses(getContext(this) as common.Context, this.courses);
+  }
+
+  private getCurrentWeekday(): number {
+    const day: number = new Date().getDay();
+    return day === 0 ? 7 : day;
   }
 
   private courseAt(weekday: number, period: number): Course | undefined {
@@ -175,60 +181,76 @@ export struct StudentSchedulePage {
   topBar() {
     Row() {
       Text('‹')
-        .fontSize(30)
-        .fontColor('#1F2937')
-        .width(40)
-        .height(40)
-        .textAlign(TextAlign.Center)
+        .fontSize(28)
+        .fontColor(AppTheme.inkSoft)
+        .padding({ left: 4, right: 10 })
         .onClick(() => { this.showSchedulePage = false; })
 
-      Text('学生课表')
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#111827')
-        .layoutWeight(1)
-        .textAlign(TextAlign.Center)
+      Column({ space: 2 }) {
+        Text('学生课表')
+          .fontSize(17)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.ink)
 
-      Text('本地保存')
-        .fontSize(11)
-        .fontColor('#94A3B8')
-        .margin({ right: 10 })
+        Text('个人日常学业作息与安全联动')
+          .fontSize(10)
+          .fontColor(AppTheme.muted)
+          .margin({ top: 2 })
+      }
+      .alignItems(HorizontalAlign.Start)
 
-      Text('＋')
-        .fontSize(24)
-        .fontColor('#2563EB')
-        .width(34)
-        .height(34)
-        .textAlign(TextAlign.Center)
-        .onClick(() => this.openAdd())
+      Blank()
+
+      Row({ space: 4 }) {
+        Row()
+          .width(6)
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor(AppTheme.info)
+        Text('添加课程')
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(AppTheme.accent)
+      }
+      .padding({ left: 11, right: 11, top: 6, bottom: 6 })
+      .borderRadius(12)
+      .backgroundColor(AppTheme.accentSoft)
+      .border({ width: 1, color: AppTheme.cyanSoft })
+      .onClick(() => this.openAdd())
     }
     .width('100%')
-    .height(54)
-    .padding({ left: 8, right: 8 })
-    .backgroundColor(Color.White)
+    .padding({ left: 14, right: 16, top: 14, bottom: 12 })
+    .backgroundColor(AppTheme.surface)
+    .border({ width: { bottom: 1 }, color: AppTheme.line })
   }
 
   @Builder
   weekHeader() {
     Row() {
       Column() {
-        Text('第').fontSize(11).fontColor('#9CA3AF')
-        Text('3').fontSize(22).fontWeight(FontWeight.Bold).fontColor('#374151').margin({ top: 2, bottom: 2 })
-        Text('周').fontSize(11).fontColor('#9CA3AF')
+        Text('本').fontSize(11).fontColor(AppTheme.muted)
+        Text('周').fontSize(22).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink).margin({ top: 2, bottom: 2 })
+        Text('课表').fontSize(11).fontColor(AppTheme.muted)
       }
       .width(48)
       .height(70)
       .justifyContent(FlexAlign.Center)
       .borderRadius(14)
-      .backgroundColor('#F5F6F7')
+      .backgroundColor(AppTheme.surfaceMuted)
+      .border({ width: 1, color: AppTheme.line })
 
       ForEach(this.weekdays, (day: string, index: number) => {
         Column({ space: 4 }) {
-          Text(day).fontSize(12).fontColor('#374151').textAlign(TextAlign.Center).width('100%')
-          Text(index === 6 ? '今天' : (index < 5 ? '有课' : '无'))
+          Text(day)
+            .fontSize(12)
+            .fontColor(index + 1 === this.getCurrentWeekday() ? AppTheme.accent : AppTheme.inkSoft)
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .fontWeight(index + 1 === this.getCurrentWeekday() ? FontWeight.Bold : FontWeight.Normal)
+          Text(index + 1 === this.getCurrentWeekday() ? '今天' : '')
             .fontSize(9)
-            .fontWeight(index === 6 ? FontWeight.Bold : FontWeight.Normal)
-            .fontColor(index === 6 ? '#2563EB' : (index < 5 ? '#9CA3AF' : '#D1D5DB'))
+            .fontWeight(index + 1 === this.getCurrentWeekday() ? FontWeight.Bold : FontWeight.Normal)
+            .fontColor(index + 1 === this.getCurrentWeekday() ? AppTheme.accent : AppTheme.muted)
             .textAlign(TextAlign.Center)
             .width('100%')
         }
@@ -238,8 +260,10 @@ export struct StudentSchedulePage {
     }
     .width('100%')
     .padding(10)
-    .backgroundColor(Color.White)
+    .backgroundColor(AppTheme.surface)
     .borderRadius(16)
+    .border({ width: 1, color: AppTheme.line })
+    .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
   }
 
   @Builder
@@ -251,8 +275,8 @@ export struct StudentSchedulePage {
     }
     .width('100%')
     .height(58)
-    .backgroundColor(Color.White)
-    .border({ width: 0.5, color: '#F0F2F5' })
+    .backgroundColor(AppTheme.surface)
+    .border({ width: 0.5, color: AppTheme.line })
   }
 
   @Builder
@@ -267,7 +291,7 @@ export struct StudentSchedulePage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(this.courseAt(weekday, period)!.location)
           .fontSize(8)
-          .fontColor('#64748B')
+          .fontColor(AppTheme.muted)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
@@ -276,7 +300,7 @@ export struct StudentSchedulePage {
       .padding(6)
       .borderRadius(8)
       .backgroundColor(this.bg(this.courseAt(weekday, period)!.color))
-      .border({ width: this.courseAt(weekday, period)!.name === '数据结构' ? 2 : 0, color: '#2563EB' })
+      .border({ width: 1, color: this.fg(this.courseAt(weekday, period)!.color) })
       .onClick(() => this.openEdit(this.courseAt(weekday, period)!))
     }
   }
@@ -287,14 +311,20 @@ export struct StudentSchedulePage {
       ForEach(this.periods, (period: number, periodIndex: number) => {
         Row() {
           Column() {
-            Text(this.periodTimes[periodIndex][0]).fontSize(9).fontColor('#6B7280')
-            Text(this.periodTimes[periodIndex][1]).fontSize(9).fontColor('#9CA3AF').margin({ top: 2 })
+            Text(this.periodTimes[periodIndex][0])
+              .fontSize(9)
+              .fontColor(AppTheme.muted)
+            Text(this.periodTimes[periodIndex][1])
+              .fontSize(9)
+              .fontColor(AppTheme.muted)
+              .margin({ top: 2 })
           }
           .width(52)
           .height(58)
           .justifyContent(FlexAlign.Center)
-          .backgroundColor(Color.White)
+          .backgroundColor(AppTheme.surface)
           .borderRadius(10)
+          .border({ width: 1, color: AppTheme.line })
 
           ForEach(this.weekdays, (day: string, dayIndex: number) => {
             this.scheduleCell(dayIndex + 1, period)
@@ -306,7 +336,21 @@ export struct StudentSchedulePage {
     .width('100%')
     .padding({ top: 1, bottom: 1 })
     .borderRadius(18)
-    .backgroundColor('#FFFFFF')
+    .backgroundColor(AppTheme.surface)
+    .border({ width: 1, color: AppTheme.line })
+  }
+
+  @Builder
+  colorChoice(color: CourseColor, fg: string, bg: string) {
+    Row()
+      .width(30)
+      .height(30)
+      .borderRadius(15)
+      .backgroundColor(this.formColor === color ? fg : bg)
+      .border({ width: 2, color: this.formColor === color ? fg : AppTheme.line })
+      .onClick(() => {
+        this.formColor = color;
+      })
   }
 
   @Builder
@@ -325,48 +369,57 @@ export struct StudentSchedulePage {
           Text(this.editingId === '' ? '新增课程' : '编辑课程')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#111827')
+            .fontColor(AppTheme.ink)
             .layoutWeight(1)
-          Text('×')
-            .fontSize(24)
-            .fontColor('#64748B')
+          Text('关闭')
+            .fontSize(12)
+            .fontColor(AppTheme.muted)
+            .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+            .borderRadius(10)
+            .backgroundColor(AppTheme.surfaceMuted)
             .onClick(() => this.editorVisible = false)
         }
 
         TextInput({ placeholder: '课程名称', text: this.formName })
           .height(46)
-          .backgroundColor('#F8FAFC')
+          .fontSize(12)
+          .backgroundColor(AppTheme.surfaceMuted)
           .borderRadius(12)
+          .border({ width: 1, color: AppTheme.line })
+          .padding({ left: 12, right: 12 })
           .onChange((value: string) => this.formName = value)
 
         TextInput({ placeholder: '上课地点，例如 教学楼A301', text: this.formLocation })
           .height(46)
-          .backgroundColor('#F8FAFC')
+          .fontSize(12)
+          .backgroundColor(AppTheme.surfaceMuted)
           .borderRadius(12)
+          .border({ width: 1, color: AppTheme.line })
+          .padding({ left: 12, right: 12 })
           .onChange((value: string) => this.formLocation = value)
 
         Row({ space: 8 }) {
-          Text('星期').fontSize(12).fontColor('#64748B').width(42)
+          Text('星期').fontSize(12).fontColor(AppTheme.muted).width(42)
           ForEach(this.weekdays, (day: string, index: number) => {
             Text(day.substring(1))
               .fontSize(12)
-              .fontColor(this.formWeekday === index + 1 ? Color.White : '#475569')
+              .fontColor(this.formWeekday === index + 1 ? Color.White : AppTheme.inkSoft)
               .textAlign(TextAlign.Center)
               .width(31)
               .height(31)
               .borderRadius(16)
-              .backgroundColor(this.formWeekday === index + 1 ? '#2563EB' : '#F1F5F9')
+              .backgroundColor(this.formWeekday === index + 1 ? AppTheme.accent : AppTheme.surfaceMuted)
               .onClick(() => this.formWeekday = index + 1)
           })
         }
 
         Row({ space: 8 }) {
-          Text('节次').fontSize(12).fontColor('#64748B').width(42)
+          Text('节次').fontSize(12).fontColor(AppTheme.muted).width(42)
           Text('第 ' + this.selectPeriodLabel(this.formStartPeriod) + ' 节起')
             .fontSize(12)
-            .fontColor('#334155')
+            .fontColor(AppTheme.inkSoft)
             .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor('#F8FAFC')
+            .backgroundColor(AppTheme.surfaceMuted)
             .borderRadius(10)
             .onClick(() => {
               this.formStartPeriod = this.formStartPeriod >= 8 ? 1 : this.formStartPeriod + 1;
@@ -374,9 +427,9 @@ export struct StudentSchedulePage {
             })
           Text('至第 ' + this.selectPeriodLabel(this.formEndPeriod) + ' 节')
             .fontSize(12)
-            .fontColor('#334155')
+            .fontColor(AppTheme.inkSoft)
             .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor('#F8FAFC')
+            .backgroundColor(AppTheme.surfaceMuted)
             .borderRadius(10)
             .onClick(() => {
               this.formEndPeriod = this.formEndPeriod >= 8 ? this.formStartPeriod : this.formEndPeriod + 1;
@@ -384,7 +437,7 @@ export struct StudentSchedulePage {
         }
 
         Row({ space: 8 }) {
-          Text('颜色').fontSize(12).fontColor('#64748B').width(42)
+          Text('颜色').fontSize(12).fontColor(AppTheme.muted).width(42)
           this.colorChoice(CourseColor.BLUE, '#2563EB', '#EFF6FF')
           this.colorChoice(CourseColor.GREEN, '#059669', '#ECFDF5')
           this.colorChoice(CourseColor.RED, '#DC2626', '#FEF2F2')
@@ -398,8 +451,8 @@ export struct StudentSchedulePage {
               .layoutWeight(1)
               .height(46)
               .borderRadius(12)
-              .backgroundColor('#FEF2F2')
-              .fontColor('#DC2626')
+              .backgroundColor(AppTheme.dangerSoft)
+              .fontColor(AppTheme.danger)
               .onClick(() => {
                 const id: string = this.editingId;
                 this.editorVisible = false;
@@ -410,7 +463,7 @@ export struct StudentSchedulePage {
             .layoutWeight(2)
             .height(46)
             .borderRadius(12)
-            .backgroundColor('#2563EB')
+            .backgroundColor(AppTheme.accent)
             .fontColor(Color.White)
             .onClick(() => this.saveForm())
         }
@@ -418,7 +471,7 @@ export struct StudentSchedulePage {
       .width('92%')
       .padding(18)
       .borderRadius(22)
-      .backgroundColor(Color.White)
+      .backgroundColor(AppTheme.surface)
       .shadow({ radius: 18, color: 'rgba(15,23,42,0.18)', offsetY: 8 })
       .align(Alignment.Bottom)
       .margin({ bottom: 18 })
@@ -427,93 +480,96 @@ export struct StudentSchedulePage {
     .height('100%')
   }
 
-  @Builder
-  colorChoice(value: CourseColor, textColor: string, bgColor: string) {
-    Text('●')
-      .fontSize(16)
-      .fontColor(textColor)
-      .textAlign(TextAlign.Center)
-      .width(34)
-      .height(34)
-      .borderRadius(17)
-      .backgroundColor(bgColor)
-      .border({ width: this.formColor === value ? 2 : 0, color: textColor })
-      .onClick(() => this.formColor = value)
-  }
-
   build() {
-    Stack() {
-      Column() {
-        this.topBar()
+    Column() {
+      this.topBar()
 
-        Scroll() {
-          Column({ space: 12 }) {
-            this.weekHeader()
+      Scroll() {
+        Column({ space: 12 }) {
+          this.weekHeader()
 
-            Text('点击已有课程可直接编辑；右上角「＋」新增课程')
-              .fontSize(11)
-              .fontColor('#94A3B8')
-              .width('100%')
-              .padding({ left: 4, right: 4 })
-
-            if (!this.loading) {
-              this.scheduleGrid()
-            }
-
-            Column() {
-              Text('我的课程')
-                .fontSize(14)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#334155')
-                .width('100%')
-                .margin({ bottom: 8 })
-
-              ForEach(this.courses, (course: Course) => {
-                Row() {
-                  Column() {
-                    Text(course.name).fontSize(13).fontWeight(FontWeight.Bold).fontColor('#334155')
-                    Text(this.weekdays[course.weekday - 1] + ' · 第' + course.startPeriod + '-' + course.endPeriod + '节 · ' + course.location)
-                      .fontSize(10)
-                      .fontColor('#94A3B8')
-                      .margin({ top: 3 })
-                  }
-                  .layoutWeight(1)
-
-                  Text('编辑')
-                    .fontSize(11)
-                    .fontColor('#2563EB')
-                    .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-                    .backgroundColor('#EFF6FF')
-                    .borderRadius(8)
-                    .onClick(() => this.openEdit(course))
-                }
-                .width('100%')
-                .padding({ top: 10, bottom: 10 })
-                .border({ width: 0, color: '#E5E7EB' })
-              }, (course: Course) => course.id)
-            }
+          Text('点击已有课程可直接编辑；右上角按钮新增课程')
+            .fontSize(11)
+            .fontColor(AppTheme.muted)
             .width('100%')
-            .padding(14)
-            .borderRadius(18)
-            .backgroundColor(Color.White)
+            .padding({ left: 4, right: 4 })
 
-            Text('课程信息保存在本机，关闭 App 后仍会保留；后续可替换为校园教务系统同步。')
-              .fontSize(10)
-              .fontColor('#B0B7C3')
+          if (!this.loading) {
+            this.scheduleGrid()
+          }
+
+          Column() {
+            Text('我的课程')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppTheme.ink)
               .width('100%')
-              .textAlign(TextAlign.Center)
-              .padding({ top: 6, bottom: 22 })
+              .margin({ bottom: 8 })
+
+            if (this.courses.length === 0) {
+              Column({ space: 6 }) {
+                Row()
+                  .width(26)
+                  .height(26)
+                  .borderRadius(13)
+                  .backgroundColor(AppTheme.cyanSoft)
+                Text('暂无课程，点击右上角按钮添加课程')
+                  .fontSize(12)
+                  .fontColor(AppTheme.muted)
+                  .width('100%')
+                  .textAlign(TextAlign.Center)
+              }
+              .width('100%')
+              .padding({ top: 16, bottom: 16 })
+            }
+
+            ForEach(this.courses, (course: Course) => {
+              Row() {
+                Column({ space: 4 }) {
+                  Text(course.name)
+                    .fontSize(13)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(AppTheme.ink)
+                  Text(this.weekdays[course.weekday - 1] + ' · 第' + course.startPeriod + '-' + course.endPeriod + '节 · ' + course.location)
+                    .fontSize(10)
+                    .fontColor(AppTheme.muted)
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+
+                Text('编辑')
+                  .fontSize(11)
+                  .fontColor(AppTheme.accent)
+                  .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                  .backgroundColor(AppTheme.accentSoft)
+                  .borderRadius(8)
+                  .onClick(() => this.openEdit(course))
+              }
+              .width('100%')
+              .padding({ top: 10, bottom: 10 })
+              .border({ width: { bottom: 1 }, color: AppTheme.line })
+            }, (course: Course) => course.id)
           }
           .width('100%')
-          .padding({ left: 12, right: 12, top: 10, bottom: 20 })
+          .padding(14)
+          .borderRadius(18)
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
+
+          Text('课程信息保存在本机，关闭 App 后仍会保留；后续可替换为校园教务系统同步。')
+            .fontSize(10)
+            .fontColor(AppTheme.muted)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 6, bottom: 22 })
         }
-        .layoutWeight(1)
-        .backgroundColor('#F5F6F7')
-        .scrollBar(BarState.Off)
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 10, bottom: 20 })
       }
       .width('100%')
-      .height('100%')
-      .backgroundColor('#F5F6F7')
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
 
       if (this.editorVisible) {
         this.editorPanel()
@@ -521,5 +577,6 @@ export struct StudentSchedulePage {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor(AppTheme.canvas)
   }
 }
