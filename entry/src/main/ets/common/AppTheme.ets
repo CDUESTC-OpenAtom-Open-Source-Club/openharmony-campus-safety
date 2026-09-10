@@ -1,43 +1,49 @@
 /**
- * 鸿蒙智安统一视觉设计令牌 (Design Tokens)。
+ * 鸿蒙智安参考图浅蓝校园安防设计令牌。
  *
- * 采用专业级智慧安防数字化指挥中心风格：
- * 极简冷灰底白画布、深邃安防蓝主色、高冷岩板蓝灰、清爽冷青辅色，
- * 搭配精确的警示冷橙与应急冷红，呈现高质感、现代化的工控与安全协同质感。
+ * 以参考图的浅蓝白为画布，以清晰的协同蓝构建信息秩序；
+ * 红、绿、琥珀色仅用于具有明确业务含义的状态。
  */
 export class AppTheme {
   // 画布与容器表面
-  static readonly canvas: string = '#F8FAFC';
+  static readonly canvas: string = '#F4F8FF';
   static readonly surface: string = '#FFFFFF';
-  static readonly surfaceMuted: string = '#F1F5F9';
-  static readonly surfaceSubtle: string = '#EDF2F7';
+  static readonly surfaceMuted: string = '#EEF5FF';
+  static readonly surfaceSubtle: string = '#DCEBFF';
 
   // 文字与排版层次
-  static readonly ink: string = '#0F172A';
-  static readonly inkSoft: string = '#334155';
-  static readonly muted: string = '#64748B';
-  static readonly line: string = '#E2E8F0';
-  static readonly lineStrong: string = '#CBD5E1';
+  static readonly ink: string = '#18243E';
+  static readonly inkSoft: string = '#52617B';
+  static readonly muted: string = '#8A97AF';
+  static readonly line: string = '#E7EEF8';
+  static readonly lineStrong: string = '#B6CDF0';
 
-  // 核心安防主色（科技蓝系列）
-  static readonly accent: string = '#2563EB';
-  static readonly accentDark: string = '#0B192C';
-  static readonly accentDeep: string = '#1E3A8A';
-  static readonly accentSoft: string = '#EFF6FF';
+  // 核心安防主色与辅助色
+  static readonly accent: string = '#1677FF';
+  static readonly accentDark: string = '#2469FF';
+  static readonly accentDeep: string = '#1755F5';
+  static readonly accentSoft: string = '#E2EFFF';
+  static readonly bronze: string = '#9A7337';
+  static readonly bronzeSoft: string = '#F3E8D2';
 
   // 辅助状态色
-  static readonly cyan: string = '#0284C7';
-  static readonly cyanSoft: string = '#E0F2FE';
-  static readonly amber: string = '#D97706';
-  static readonly amberSoft: string = '#FEF3C7';
-  static readonly danger: string = '#DC2626';
-  static readonly dangerSoft: string = '#FEF2F2';
-  static readonly success: string = '#059669';
-  static readonly successSoft: string = '#ECFDF5';
-  static readonly info: string = '#0284C7';
-  static readonly infoSoft: string = '#F0F9FF';
+  static readonly cyan: string = '#3B82F6';
+  static readonly cyanSoft: string = '#E6F0FF';
+  static readonly amber: string = '#FF941F';
+  static readonly amberSoft: string = '#FAEFD9';
+  static readonly danger: string = '#FF4F58';
+  static readonly dangerSoft: string = '#F9E3E3';
+  static readonly success: string = '#20BEA0';
+  static readonly successSoft: string = '#E0F1EA';
+  static readonly info: string = '#176B9C';
+  static readonly infoSoft: string = '#DCEEF8';
 
-  // 装饰与微阴影
-  static readonly glowBlue: string = 'rgba(37, 99, 235, 0.16)';
-  static readonly cardShadow: string = 'rgba(15, 23, 42, 0.04)';
+  // 布局与微阴影
+  static readonly radiusSmall: number = 8;
+  static readonly radiusMedium: number = 12;
+  static readonly radiusLarge: number = 16;
+  static readonly pageInset: number = 20;
+  static readonly sectionGap: number = 24;
+  static readonly glowBlue: string = 'rgba(22, 119, 255, 0.18)';
+  static readonly cardShadow: string = 'rgba(22, 82, 160, 0.10)';
 }

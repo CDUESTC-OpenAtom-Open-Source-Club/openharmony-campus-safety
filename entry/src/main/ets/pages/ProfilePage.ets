@@ -170,7 +170,7 @@ export struct ProfilePage {
             .border({ width: 1, color: AppTheme.line })
             .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
           } else {
-            // 已登录凭证卡（科技蓝深色胸卡质感）
+            // 已登录凭证卡采用深蓝基底与铜金信息点。
             Column({ space: 14 }) {
               Row() {
                 Row() {
@@ -184,7 +184,7 @@ export struct ProfilePage {
                 .borderRadius(15)
                 .backgroundColor(AppTheme.accent)
                 .justifyContent(FlexAlign.Center)
-                .shadow({ radius: 8, color: 'rgba(37,99,235,0.3)', offsetY: 2 })
+                .shadow({ radius: 8, color: AppTheme.glowBlue, offsetY: 2 })
 
                 Column({ space: 4 }) {
                   Row({ space: 6 }) {
@@ -195,10 +195,10 @@ export struct ProfilePage {
                     Text(this.user()?.role ?? '')
                       .fontSize(10)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor('#38BDF8')
+                      .fontColor('#B9DCF1')
                       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                       .borderRadius(4)
-                      .backgroundColor('rgba(56,189,248,0.18)')
+                      .backgroundColor('rgba(23,107,156,0.22)')
                   }
                   Text('账号标识：' + (this.user()?.id ?? ''))
                     .fontSize(10)
@@ -211,8 +211,8 @@ export struct ProfilePage {
 
               Row() {
                 Row({ space: 4 }) {
-                  Row().width(6).height(6).borderRadius(3).backgroundColor('#34D399')
-                  Text('凭证状态：正常活跃').fontSize(10).fontColor('#A7F3D0')
+                  Row().width(6).height(6).borderRadius(3).backgroundColor('#CFE6DC')
+                  Text('凭证状态：正常活跃').fontSize(10).fontColor('#CFE6DC')
                 }
                 Blank()
                 Text('安全等级：高').fontSize(10).fontColor('rgba(255,255,255,0.7)')
@@ -225,8 +225,8 @@ export struct ProfilePage {
             .padding(18)
             .borderRadius(18)
             .backgroundColor(AppTheme.accentDark)
-            .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
-            .shadow({ radius: 12, color: 'rgba(11,25,44,0.16)', offsetY: 3 })
+            .border({ width: 1, color: 'rgba(185,220,241,0.32)' })
+            .shadow({ radius: 12, color: 'rgba(11,41,66,0.18)', offsetY: 3 })
 
             // 功能列表卡片
             Column() {

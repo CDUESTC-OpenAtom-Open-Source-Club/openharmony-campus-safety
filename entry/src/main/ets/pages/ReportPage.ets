@@ -30,11 +30,11 @@ export struct ReportPage {
   @State private attachmentPaths: string[] = [];
 
   private typeCards: TypeCard[] = [
-    { type: EventType.FIRE, label: '消防安全', tag: 'FIRE', color: '#DC2626', bg: '#FEF2F2' },
-    { type: EventType.ELECTRIC, label: '电气线路', tag: 'ELEC', color: '#D97706', bg: '#FFFBEB' },
-    { type: EventType.FACILITY, label: '公共设施', tag: 'EQPT', color: '#2563EB', bg: '#EFF6FF' },
-    { type: EventType.CAMPUS, label: '校园秩序', tag: 'SAFE', color: '#059669', bg: '#ECFDF5' },
-    { type: EventType.OTHER, label: '其他事件', tag: 'MISC', color: '#475569', bg: '#F1F5F9' }
+    { type: EventType.FIRE, label: '消防安全', tag: 'FIRE', color: AppTheme.danger, bg: AppTheme.dangerSoft },
+    { type: EventType.ELECTRIC, label: '电气线路', tag: 'ELEC', color: AppTheme.amber, bg: AppTheme.amberSoft },
+    { type: EventType.FACILITY, label: '公共设施', tag: 'EQPT', color: AppTheme.accent, bg: AppTheme.accentSoft },
+    { type: EventType.CAMPUS, label: '校园秩序', tag: 'SAFE', color: AppTheme.success, bg: AppTheme.successSoft },
+    { type: EventType.OTHER, label: '其他事件', tag: 'MISC', color: AppTheme.inkSoft, bg: AppTheme.surfaceMuted }
   ];
 
   private quickLocations: string[] = [
@@ -118,365 +118,72 @@ export struct ReportPage {
 
   build() {
     Column() {
-      // 顶部标题栏
       Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor(AppTheme.inkSoft)
-          .padding({ left: 4, right: 10 })
-          .onClick(() => {
-            this.pageStack.pop();
-          })
+        Text('‹').fontSize(30).fontColor(AppTheme.ink).width(44).height(48)
+          .onClick(() => { this.pageStack.pop(); })
+        Text('隐患上报').fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          .layoutWeight(1).textAlign(TextAlign.Center)
+        Blank().width(44)
+      }.width('100%').height(52).padding({ left: 16, right: 16 }).backgroundColor(AppTheme.canvas)
 
-        Column({ space: 2 }) {
-          Text('隐患上报')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text('随手拍隐患 · 师生共建平安校园')
-            .fontSize(10)
-            .fontColor(AppTheme.muted)
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Start)
-
-        Blank()
-
-        Row({ space: 4 }) {
-          Image($r('app.media.ic_report'))
-            .width(16)
-            .height(16)
-            .fillColor(AppTheme.accent)
-          Text('安全协同')
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(AppTheme.accent)
-        }
-        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-        .borderRadius(12)
-        .backgroundColor(AppTheme.accentSoft)
-        .border({ width: 1, color: AppTheme.cyanSoft })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
-      .backgroundColor(AppTheme.surface)
-      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       Scroll() {
-        Column({ space: 12 }) {
-          // 隐患类型选择
+        Column({ space: 20 }) {
           Column() {
-            this.sectionHeader('隐患类型选择', true, '')
-            Row({ space: 8 }) {
-              ForEach(this.typeCards.slice(0, 3), (item: TypeCard, index: number) => {
-                this.typeCell(item, index)
-              }, (item: TypeCard) => item.type)
-            }
-            .width('100%')
-            Row({ space: 8 }) {
-              ForEach(this.typeCards.slice(3, 5), (item: TypeCard, index: number) => {
-                this.typeCell(item, index + 3)
-              }, (item: TypeCard) => item.type)
-            }
-            .width('100%')
-            .margin({ top: 8 })
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
-
-          // 隐患等级
-          Column({ space: 8 }) {
-            Row() {
-              Text('隐患等级')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.ink)
-              Text('（用于评估处置优先级）')
-                .fontSize(10)
-                .fontColor(AppTheme.muted)
-                .margin({ left: 6 })
-            }
-            .width('100%')
-
+            this.sectionHeader('隐患类型', true, '')
+            Select([{ value: '消防安全' }, { value: '电气线路' }, { value: '公共设施' }, { value: '校园秩序' }, { value: '其他事件' }])
+              .selected(this.selectedTypeIndex).value(this.typeCards[this.selectedTypeIndex].label)
+              .width('100%').height(44).font({ size: 13 }).backgroundColor(AppTheme.surfaceMuted).borderRadius(8)
+              .onSelect((index: number) => { this.selectedTypeIndex = index; })
+          }.width('100%')
+          Column() {
+            this.sectionHeader('具体位置', true, '')
+            TextInput({ placeholder: '请输入隐患所在位置', text: this.location }).height(44).fontSize(13)
+              .backgroundColor(AppTheme.surfaceMuted).borderRadius(8).onChange((value: string) => { this.location = value; })
+          }.width('100%')
+          Column() {
+            this.sectionHeader('详细描述', true, '')
+            TextArea({ placeholder: '请详细描述发现的安全隐患情况…', text: this.description })
+              .height(112).fontSize(13).backgroundColor(AppTheme.surfaceMuted).borderRadius(8)
+              .onChange((value: string) => { this.description = value; })
+          }.width('100%')
+          Column() {
+            this.sectionHeader('风险等级', true, '')
             Row({ space: 8 }) {
               ForEach(this.priorityValues, (priority: EventPriority, index: number) => {
-                Text(priority)
-                  .fontSize(11)
-                  .fontWeight(this.selectedPriorityIndex === index ? FontWeight.Bold : FontWeight.Normal)
-                  .fontColor(this.selectedPriorityIndex === index ? Color.White : AppTheme.inkSoft)
-                  .padding({ left: 14, right: 14, top: 7, bottom: 7 })
-                  .borderRadius(12)
-                  .backgroundColor(
-                    this.selectedPriorityIndex === index
-                      ? (priority === EventPriority.URGENT || priority === EventPriority.HIGH ? AppTheme.danger : AppTheme.accent)
-                      : AppTheme.surfaceMuted
-                  )
-                  .layoutWeight(1)
-                  .textAlign(TextAlign.Center)
-                  .onClick(() => {
-                    this.selectedPriorityIndex = index;
-                  })
+                Text(priority).fontSize(13).height(40).layoutWeight(1).textAlign(TextAlign.Center)
+                  .fontColor(index === this.selectedPriorityIndex ? AppTheme.accent : AppTheme.inkSoft)
+                  .backgroundColor(index === this.selectedPriorityIndex ? AppTheme.accentSoft : AppTheme.surfaceMuted)
+                  .borderRadius(8).border({ width: 1, color: index === this.selectedPriorityIndex ? AppTheme.accent : AppTheme.line })
+                  .onClick(() => { this.selectedPriorityIndex = index; })
               }, (priority: EventPriority) => priority)
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-
-          // 发生地点
-          Column({ space: 8 }) {
-            this.sectionHeader('发生具体地点', true, '')
-            TextInput({
-              placeholder: '请输入发生地点',
-              text: this.location
-            })
-              .width('100%')
-              .height(42)
-              .fontSize(12)
-              .borderRadius(12)
-              .backgroundColor(AppTheme.surfaceMuted)
-              .border({ width: 1, color: AppTheme.line })
-              .padding({ left: 12, right: 12 })
-              .onChange((value: string) => {
-                this.location = value;
-              })
-
-            Scroll() {
-              Row({ space: 6 }) {
-                Text('快捷输入')
-                  .fontSize(10)
-                  .fontColor(AppTheme.muted)
-                ForEach(this.quickLocations, (loc: string) => {
-                  Text(loc)
-                    .fontSize(10)
-                    .fontColor(AppTheme.inkSoft)
-                    .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                    .borderRadius(10)
-                    .backgroundColor(AppTheme.surfaceMuted)
-                    .border({ width: 1, color: AppTheme.line })
-                    .onClick(() => {
-                      this.location = loc;
-                    })
-                }, (loc: string) => loc)
-              }
-              .width('100%')
-            }
-            .width('100%')
-            .scrollBar(BarState.Off)
-            .scrollable(ScrollDirection.Horizontal)
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-
-          // 隐患描述
-          Column({ space: 8 }) {
-            this.sectionHeader('详细隐患情况', true, '')
-            TextArea({
-              placeholder: '请详细说明现场隐患现象',
-              text: this.description
-            })
-              .width('100%')
-              .height(96)
-              .fontSize(12)
-              .borderRadius(12)
-              .backgroundColor(AppTheme.surfaceMuted)
-              .border({ width: 1, color: AppTheme.line })
-              .padding(12)
-              .onChange((value: string) => {
-                this.description = value;
-              })
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-
-          // 现场照片与上报人
-          Column({ space: 12 }) {
-            Column({ space: 6 }) {
-              Text('现场证据照片')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.ink)
-                .width('100%')
-
-              if (this.attachmentPaths.length > 0) {
-                Column({ space: 8 }) {
-                  ForEach(this.attachmentPaths, (path: string) => {
-                    Row({ space: 10 }) {
-                      Image('file://' + path)
-                        .width(58)
-                        .height(58)
-                        .borderRadius(10)
-                        .objectFit(ImageFit.Cover)
-                        .border({ width: 1, color: AppTheme.line })
-                      Text('已保存到应用私有目录')
-                        .fontSize(11)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor(AppTheme.accent)
-                        .layoutWeight(1)
-                      Text('移除')
-                        .fontSize(10)
-                        .fontColor(AppTheme.danger)
-                        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                        .borderRadius(8)
-                        .backgroundColor(AppTheme.dangerSoft)
-                        .onClick(() => {
-                          AttachmentService.remove(path);
-                          this.attachmentPaths = this.attachmentPaths.filter((item: string) => item !== path);
-                        })
-                    }
-                    .width('100%')
-                  }, (path: string) => path)
-                  Text('重新选择')
-                    .fontSize(11)
-                    .fontColor(AppTheme.accent)
-                    .onClick(() => this.selectPhotos())
-                }
-                .width('100%')
-                .padding(10)
-                .borderRadius(14)
-                .backgroundColor(AppTheme.accentSoft)
-                .border({ width: 1, color: AppTheme.cyanSoft })
-              } else {
-                Column({ space: 6 }) {
-                  Image($r('app.media.ic_report'))
-                    .width(24)
-                    .height(24)
-                    .fillColor(AppTheme.muted)
-                  Text('点击从系统相册选择照片（最多 3 张）')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppTheme.muted)
-                    .width('100%')
-                    .textAlign(TextAlign.Center)
-                }
-                .width('100%')
-                .height(76)
-                .borderRadius(14)
-                .border({ width: 1, color: AppTheme.lineStrong })
-                .borderStyle(BorderStyle.Dashed)
-                .justifyContent(FlexAlign.Center)
-                .onClick(() => {
-                  this.selectPhotos();
-                })
-              }
-            }
-            .width('100%')
-
-            Column({ space: 6 }) {
-              Row() {
-                Text('上报人姓名/电话')
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AppTheme.ink)
-                Text('（选填）')
-                  .fontSize(10)
-                  .fontColor(AppTheme.muted)
-                  .margin({ left: 6 })
-              }
-              .width('100%')
-
-              TextInput({
-                placeholder: '留空则默认为匿名上报',
-                text: this.reporter
-              })
-                .width('100%')
-                .height(42)
-                .fontSize(12)
-                .borderRadius(12)
-                .backgroundColor(AppTheme.surfaceMuted)
-                .border({ width: 1, color: AppTheme.line })
-                .padding({ left: 12, right: 12 })
-                .onChange((value: string) => {
-                  this.reporter = value;
-                })
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-
-          // 提交按钮
-          Button('立即提交隐患')
-            .width('100%')
-            .height(48)
-            .borderRadius(14)
-            .backgroundColor(AppTheme.accent)
-            .fontColor(Color.White)
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .shadow({ radius: 12, color: AppTheme.glowBlue, offsetY: 4 })
-            .margin({ top: 4, bottom: 20 })
-            .onClick(() => {
-              this.submit();
-            })
-        }
-        .width('100%')
-        .padding({ left: 14, right: 14, top: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppTheme.canvas)
-    .opacity(this.pageReady ? 1 : 0)
-    .translate({ y: this.pageReady ? 0 : 18 })
-    .animation({ duration: 320, curve: Curve.EaseOut })
-    .onAppear(() => {
-      this.pageReady = true;
-    })
-  }
-
-  @Builder
-  typeCell(item: TypeCard, index: number) {
-    Column({ space: 4 }) {
-      Text(item.tag)
-        .fontSize(10)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(this.selectedTypeIndex === index ? '#93C5FD' : item.color)
-        .letterSpacing(0.5)
-
-      Text(item.label)
-        .fontSize(12)
-        .fontWeight(this.selectedTypeIndex === index ? FontWeight.Bold : FontWeight.Medium)
-        .fontColor(this.selectedTypeIndex === index ? Color.White : AppTheme.ink)
-    }
-    .layoutWeight(1)
-    .height(64)
-    .borderRadius(14)
-    .backgroundColor(
-      this.selectedTypeIndex === index ? AppTheme.accent : item.bg
-    )
-    .border({
-      width: 1,
-      color: this.selectedTypeIndex === index ? AppTheme.accentDark : AppTheme.line
-    })
-    .shadow({
-      radius: this.selectedTypeIndex === index ? 8 : 0,
-      color: AppTheme.glowBlue,
-      offsetY: 2
-    })
-    .justifyContent(FlexAlign.Center)
-    .onClick(() => {
-      this.selectedTypeIndex = index;
-    })
+            }.width('100%')
+          }.width('100%')
+          Column() {
+            this.sectionHeader('上传照片', false, '最多 3 张 · 点击照片移除')
+            Row({ space: 8 }) {
+              ForEach(this.attachmentPaths, (path: string) => {
+                Image('file://' + path).width(64).height(72).objectFit(ImageFit.Cover).borderRadius(8)
+                  .onClick(() => {
+                    AttachmentService.remove(path);
+                    this.attachmentPaths = this.attachmentPaths.filter((item: string) => item !== path);
+                  })
+              }, (path: string) => path)
+              Text(this.attachmentPaths.length > 0 ? '重选' : '＋').fontSize(22).fontColor(AppTheme.muted)
+                .width(64).height(72).textAlign(TextAlign.Center).backgroundColor(AppTheme.surfaceMuted).borderRadius(8)
+                .onClick(() => this.selectPhotos())
+            }.width('100%')
+          }.width('100%')
+          Column() {
+            this.sectionHeader('联系人', false, '选填')
+            TextInput({ placeholder: '请输入姓名或联系电话', text: this.reporter }).height(44).fontSize(13)
+              .backgroundColor(AppTheme.surfaceMuted).borderRadius(8).onChange((value: string) => { this.reporter = value; })
+          }.width('100%')
+        }.width('100%').padding(18).backgroundColor(AppTheme.surface).borderRadius(14)
+      }.width('100%').layoutWeight(1).scrollBar(BarState.Off).padding({ left: 14, right: 14 })
+      Button('提交上报').width('92%').height(48).fontSize(15).fontColor(Color.White)
+        .linearGradient({ angle: 90, colors: [['#329DFF', 0], ['#1677FF', 1]] }).borderRadius(24)
+        .margin({ top: 10, bottom: 10 }).onClick(() => this.submit())
+    }.width('100%').height('100%').backgroundColor(AppTheme.canvas)
   }
 }

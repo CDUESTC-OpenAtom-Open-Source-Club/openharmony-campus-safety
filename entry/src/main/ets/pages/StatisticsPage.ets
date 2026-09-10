@@ -15,6 +15,7 @@ import { AppTheme } from '../common/AppTheme';
 interface BarItem {
   day: string;
   value: number;
+  completed: number;
   height: string;
 }
 
@@ -32,105 +33,12 @@ export struct StatisticsPage {
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
 
-  private domains: DomainItem[] = [
-    { type: EventType.FIRE, label: '消防器材与通道', color: AppTheme.accent },
-    { type: EventType.ELECTRIC, label: '强弱电与实验室用电', color: AppTheme.success },
-    { type: EventType.FACILITY, label: '楼宇公共设施及门窗', color: AppTheme.amber }
-  ];
-
-  private getPendingTaskCount(): number {
-    return this.tasks.filter(
-      (task: Task) =>
-        task.status === TaskStatus.PENDING ||
-        task.status === TaskStatus.PROCESSING
-    ).length;
-  }
-
-  private getCompletedTaskCount(): number {
-    return this.tasks.filter(
-      (task: Task) => task.status === TaskStatus.COMPLETED
-    ).length;
-  }
-
   private getStatistics(): SafetyStatisticsSnapshot {
     return SafetyStatisticsService.createSnapshot(this.events, this.tasks);
   }
 
-  private getHealthScore(): number | null {
-    if (this.events.length === 0 && this.tasks.length === 0) {
-      return null;
-    }
-    let penalty: number = 0;
-    this.events.forEach((event: SecurityEvent) => {
-      if (
-        event.status === EventStatus.PENDING ||
-        event.status === EventStatus.CONFIRMED
-      ) {
-        if (event.priority === EventPriority.URGENT) {
-          penalty += 18;
-        } else if (event.priority === EventPriority.HIGH) {
-          penalty += 12;
-        } else if (event.priority === EventPriority.MEDIUM) {
-          penalty += 8;
-        } else {
-          penalty += 4;
-        }
-      } else if (event.status === EventStatus.PROCESSING) {
-        penalty += 4;
-      }
-    });
-    this.tasks.forEach((task: Task) => {
-      if (task.status === TaskStatus.PENDING) {
-        penalty += 6;
-      } else if (task.status === TaskStatus.PROCESSING) {
-        penalty += 3;
-      }
-    });
-    const score: number = Math.max(0, Math.min(100, 100 - penalty));
-    return Math.round(score * 10) / 10;
-  }
-
-  private getHealthGrade(score: number | null): string {
-    if (score === null) {
-      return '暂无数据';
-    }
-    if (score >= 95) {
-      return 'A+';
-    } else if (score >= 90) {
-      return 'A';
-    } else if (score >= 80) {
-      return 'B';
-    } else if (score >= 70) {
-      return 'C';
-    }
-    return 'D';
-  }
-
-  private getHealthScoreText(): string {
-    const score: number | null = this.getHealthScore();
-    return score === null ? '—' : score.toString();
-  }
-
   private getAverageResponse(): string {
     return SafetyStatisticsService.formatMinutes(this.getStatistics().averageFirstResponseMinutes);
-  }
-
-  private getAverageHandling(): string {
-    return SafetyStatisticsService.formatMinutes(this.getStatistics().averageHandlingMinutes);
-  }
-
-  private getOnTimeRate(): string {
-    const rate: number | null = this.getStatistics().onTimeCompletionRate;
-    return rate === null ? '不适用' : rate.toString() + '%';
-  }
-
-  private getDomainRate(type: EventType): number {
-    return SafetyStatisticsService.getTypeCompletionRate(this.events, type) ?? 0;
-  }
-
-  private getDomainRateLabel(type: EventType): string {
-    const rate: number | null = SafetyStatisticsService.getTypeCompletionRate(this.events, type);
-    return rate === null ? '暂无数据' : rate.toString() + '%';
   }
 
   private isSameDay(reportTime: string, date: Date): boolean {
@@ -160,6 +68,10 @@ export struct StatisticsPage {
       items.push({
         day: weekdays[day.getDay()],
         value: count,
+        completed: this.events.filter((event: SecurityEvent) =>
+          (event.history ?? []).some((record) => record.toStatus === EventStatus.COMPLETED &&
+            this.isSameDay(record.operationTime, day))
+        ).length,
         height: '0%'
       });
     }
@@ -197,336 +109,145 @@ export struct StatisticsPage {
     .width('100%')
   }
 
-  @Builder
-  metricItem(label: string, value: string) {
-    Column({ space: 4 }) {
-      Text(label)
-        .fontSize(10)
-        .fontColor(AppTheme.muted)
-      Text(value)
-        .fontSize(14)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppTheme.ink)
+  private trendContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
+  private ringContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
+  private chartTypes: EventType[] = [EventType.FIRE, EventType.ELECTRIC, EventType.FACILITY, EventType.CAMPUS, EventType.OTHER];
+  private chartColors: string[] = ['#2477FF', '#50A8FF', '#49CDD9', '#7DDDCB', '#B5C6E7'];
+
+  private typeCount(type: EventType): number {
+    return this.events.filter((event: SecurityEvent) => event.type === type).length;
+  }
+
+  private drawTrend(): void {
+    const ctx: CanvasRenderingContext2D = this.trendContext;
+    const w: number = ctx.width;
+    const h: number = ctx.height;
+    ctx.clearRect(0, 0, w, h);
+    const items: BarItem[] = this.getLast7Days();
+    const max: number = Math.max(1, ...items.map((item: BarItem) => Math.max(item.value, item.completed)));
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = AppTheme.muted;
+    for (let i: number = 0; i <= 4; i++) {
+      const y: number = 12 + (h - 38) * i / 4;
+      ctx.beginPath(); ctx.strokeStyle = AppTheme.line; ctx.lineWidth = 1;
+      ctx.moveTo(28, y); ctx.lineTo(w - 8, y); ctx.stroke();
+      ctx.fillText((max * (4 - i) / 4).toFixed(max < 4 ? 1 : 0), 0, y + 3);
     }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start)
+    ctx.beginPath();
+    items.forEach((item: BarItem, index: number) => {
+      const x: number = 28 + (w - 40) * index / 6;
+      const y: number = h - 26 - item.value / max * (h - 38);
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#2477FF'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath();
+    items.forEach((item: BarItem, index: number) => {
+      const x: number = 28 + (w - 40) * index / 6;
+      const y: number = h - 26 - item.completed / max * (h - 38);
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#20BEBC'; ctx.lineWidth = 2; ctx.stroke();
+    items.forEach((item: BarItem, index: number) => {
+      const x: number = 28 + (w - 40) * index / 6;
+      const y: number = h - 26 - item.value / max * (h - 38);
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fillStyle = '#2477FF'; ctx.fill();
+      ctx.fillStyle = AppTheme.muted; ctx.fillText(item.day, x - 12, h - 7);
+    });
+  }
+
+  private drawRing(): void {
+    const ctx: CanvasRenderingContext2D = this.ringContext;
+    ctx.clearRect(0, 0, ctx.width, ctx.height);
+    const r: number = Math.min(ctx.width, ctx.height) / 2 - 13;
+    let angle: number = -Math.PI / 2;
+    ctx.lineWidth = 19;
+    ctx.beginPath(); ctx.strokeStyle = AppTheme.line;
+    ctx.arc(ctx.width / 2, ctx.height / 2, r, 0, Math.PI * 2); ctx.stroke();
+    this.chartTypes.forEach((type: EventType, index: number) => {
+      const sweep: number = this.events.length === 0 ? 0 : this.typeCount(type) / this.events.length * Math.PI * 2;
+      if (sweep > 0) {
+        ctx.beginPath(); ctx.strokeStyle = this.chartColors[index];
+        ctx.arc(ctx.width / 2, ctx.height / 2, r, angle, angle + sweep); ctx.stroke();
+        angle += sweep;
+      }
+    });
   }
 
   @Builder
-  domainMeter(item: DomainItem) {
-    Column({ space: 8 }) {
-      Row() {
-        Row()
-          .width(4)
-          .height(12)
-          .borderRadius(2)
-          .backgroundColor(item.color)
-          .margin({ right: 6 })
-        Text(item.label)
-          .fontSize(11)
-          .fontColor(AppTheme.inkSoft)
-          .layoutWeight(1)
-        Text(this.getDomainRateLabel(item.type))
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppTheme.ink)
-      }
-      .width('100%')
-
-      Row() {
-        Row()
-          .width(this.getDomainRate(item.type).toString() + '%')
-          .height(8)
-          .borderRadius(4)
-          .backgroundColor(item.color)
-      }
-      .width('100%')
-      .height(8)
-      .borderRadius(4)
-      .backgroundColor(AppTheme.surfaceMuted)
-    }
-    .width('100%')
+  overviewMetric(label: string, value: string, note: string) {
+    Column({ space: 7 }) {
+      Text(label).fontSize(11).fontColor(AppTheme.muted)
+      Text(value).fontSize(23).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink).maxLines(1).minFontSize(14).maxFontSize(23)
+      Text(note).fontSize(10).fontColor(AppTheme.success)
+    }.layoutWeight(1).alignItems(HorizontalAlign.Start).padding(12).backgroundColor(AppTheme.surface).borderRadius(12)
   }
 
   build() {
     Column() {
-      // 顶部标题栏
       Row() {
-        Text('‹')
-          .fontSize(28)
-          .fontColor(AppTheme.inkSoft)
-          .padding({ left: 4, right: 10 })
-          .onClick(() => {
-            this.pageStack.pop();
-          })
-
-        Column({ space: 2 }) {
-          Text('数据统计')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text('校园安全态势综合量化分析')
-            .fontSize(10)
-            .fontColor(AppTheme.muted)
-        }
-        .alignItems(HorizontalAlign.Start)
-
-        Blank()
-
-        Text('刷新')
-          .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppTheme.accent)
-          .padding({ left: 11, right: 11, top: 5, bottom: 5 })
-          .borderRadius(12)
-          .backgroundColor(AppTheme.accentSoft)
-          .border({ width: 1, color: AppTheme.cyanSoft })
-          .onClick(() => {
-            this.refreshData();
-          })
-      }
-      .width('100%')
-      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
-      .backgroundColor(AppTheme.surface)
-      .border({ width: { bottom: 1 }, color: AppTheme.line })
-
+        Text('‹').fontSize(30).width(44).height(48).onClick(() => { this.pageStack.pop(); })
+        Text('数据统计').fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink).layoutWeight(1).textAlign(TextAlign.Center)
+        Text('刷新').fontSize(12).fontColor(AppTheme.accent).width(44).textAlign(TextAlign.End)
+          .onClick(() => { this.refreshData(); this.drawTrend(); this.drawRing(); })
+      }.height(52).width('100%').padding({ left: 16, right: 16 })
       Scroll() {
-        Column({ space: 12 }) {
-          // 实时健康度卡片 (现代冷色安全座舱)
-          Column() {
-            Row() {
-              Column({ space: 6 }) {
-                Row({ space: 6 }) {
-                  Row()
-                    .width(6)
-                    .height(6)
-                    .borderRadius(3)
-                    .backgroundColor('#38BDF8')
-                  Text('综合态势 · ' + this.getHealthGrade(this.getHealthScore()))
-                    .fontSize(10)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#38BDF8')
-                    .letterSpacing(0.5)
-                }
-                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                .borderRadius(6)
-                .backgroundColor('rgba(56,189,248,0.12)')
-                .border({ width: 1, color: 'rgba(56,189,248,0.25)' })
-
-                Text('校园安全运行指数')
-                  .fontSize(19)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(Color.White)
-              }
-              .alignItems(HorizontalAlign.Start)
-
-              Blank()
-
-              Column() {
-                Text(this.getHealthScoreText())
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#38BDF8')
-              }
-              .width(52)
-              .height(52)
-              .borderRadius(26)
-              .border({ width: 2.5, color: AppTheme.info })
-              .backgroundColor('rgba(2,132,199,0.15)')
-              .justifyContent(FlexAlign.Center)
-            }
-            .width('100%')
-            .margin({ bottom: 12 })
-
-            Row() {
-              Text('平均首次响应：' + this.getAverageResponse())
-                .fontSize(11)
-                .fontColor('rgba(255,255,255,0.7)')
-
-              Blank()
-
-              Text('安全等级：' + this.getHealthGrade(this.getHealthScore()))
-                .fontSize(11)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('rgba(255,255,255,0.85)')
-            }
-            .width('100%')
-            .padding({ top: 10 })
-            .border({ width: { top: 1 }, color: 'rgba(255,255,255,0.12)' })
-          }
-          .width('100%')
-          .padding(18)
-          .borderRadius(20)
-          .backgroundColor(AppTheme.accentDark)
-          .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
-          .shadow({ radius: 14, color: 'rgba(11,25,44,0.35)', offsetY: 6 })
-
-          // 核心状态指标卡片
+        Column({ space: 16 }) {
           Row({ space: 8 }) {
-            Column() {
-              Text('待确认')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.muted)
-              Text(this.getStatistics().pendingEvents.toString())
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.accent)
-                .margin({ top: 4 })
-              Text('需要核实')
-                .fontSize(9)
-                .fontColor(AppTheme.muted)
-                .margin({ top: 2 })
-            }
-            .layoutWeight(1)
-            .padding(12)
-            .borderRadius(14)
-            .backgroundColor(AppTheme.surface)
-            .border({ width: 1, color: AppTheme.line })
-            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-
-            Column() {
-              Text('处理中')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.muted)
-              Text(this.getStatistics().processingEvents.toString())
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.amber)
-                .margin({ top: 4 })
-              Text('正在处置')
-                .fontSize(9)
-                .fontColor(AppTheme.muted)
-                .margin({ top: 2 })
-            }
-            .layoutWeight(1)
-            .padding(12)
-            .borderRadius(14)
-            .backgroundColor(AppTheme.surface)
-            .border({ width: 1, color: AppTheme.line })
-            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-
-            Column() {
-              Text('待审核')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(AppTheme.muted)
-              Text(this.getStatistics().reviewEvents.toString())
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppTheme.success)
-                .margin({ top: 4 })
-              Text('整改完毕')
-                .fontSize(9)
-                .fontColor(AppTheme.muted)
-                .margin({ top: 2 })
-            }
-            .layoutWeight(1)
-            .padding(12)
-            .borderRadius(14)
-            .backgroundColor(AppTheme.surface)
-            .border({ width: 1, color: AppTheme.line })
-            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-          }
-          .width('100%')
-
-          // 处置效率看板
-          Column({ space: 10 }) {
-            this.sectionHeader('处置效率与质量', '实时计算')
-
-            Row({ space: 8 }) {
-              this.metricItem('已完成', this.getStatistics().completedEvents.toString())
-              this.metricItem('超时任务', this.getStatistics().overdueTasks.toString())
-              this.metricItem('平均处置', this.getAverageHandling())
-              this.metricItem('按期完成', this.getOnTimeRate())
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-
-          // 各重点安防领域达标率
+            this.overviewMetric('事件总数', this.events.length.toString(), '可见事件')
+            this.overviewMetric('完成率', this.events.length === 0 ? '—' : Math.round(this.getStatistics().completedEvents / this.events.length * 100) + '%', '事件办结')
+            this.overviewMetric('平均响应', this.getAverageResponse(), '首次响应')
+          }.width('100%')
           Column({ space: 12 }) {
-            this.sectionHeader('各重点安防领域达标率', '实时计算')
-
-            ForEach(this.domains, (item: DomainItem) => {
-              this.domainMeter(item)
-            }, (item: DomainItem) => item.type)
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-
-          // 近 7 日事件趋势（按实际报告时间统计）
-          Column() {
-            this.sectionHeader('近 7 日事件办结趋势', '实时')
-
-            Row() {
-              ForEach(this.getLast7Days(), (item: BarItem) => {
-                Column() {
-                  Text(item.value.toString())
-                    .fontSize(9)
-                    .fontColor(AppTheme.muted)
-                  Column() {
-                    Column()
-                      .width('100%')
-                      .height(item.height)
-                      .borderRadius({ topLeft: 4, topRight: 4 })
-                      .backgroundColor(AppTheme.accent)
-                  }
-                  .width(14)
-                  .height(56)
-                  .borderRadius({ topLeft: 4, topRight: 4 })
-                  .backgroundColor(AppTheme.surfaceMuted)
-                  .justifyContent(FlexAlign.End)
-                  .margin({ top: 4 })
-
-                  Text(item.day)
-                    .fontSize(9)
-                    .fontColor(AppTheme.muted)
-                    .margin({ top: 4 })
+            this.sectionHeader('事件趋势', '近 7 天')
+            Row({ space: 6 }) {
+              Blank()
+              Circle().width(6).height(6).fill('#2477FF')
+              Text('上报量').fontSize(10).fontColor(AppTheme.muted)
+              Circle().width(6).height(6).fill('#20BEBC').margin({ left: 10 })
+              Text('完成量').fontSize(10).fontColor(AppTheme.muted)
+            }.width('100%')
+            Canvas(this.trendContext).width('100%').height(155)
+              .onReady(() => this.drawTrend()).onAreaChange(() => this.drawTrend())
+          }.width('100%').padding(14).backgroundColor(AppTheme.surface).borderRadius(12)
+          Column({ space: 14 }) {
+            this.sectionHeader('事件类型分布', '')
+            Row({ space: 18 }) {
+              Stack() {
+                Canvas(this.ringContext).width(142).height(142).onReady(() => this.drawRing())
+                Column({ space: 3 }) {
+                  Text(this.events.length.toString()).fontSize(26).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+                  Text('总事件数').fontSize(10).fontColor(AppTheme.muted)
                 }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Center)
-              }, (item: BarItem) => item.day)
-            }
-            .width('100%')
-            .height(96)
-            .alignItems(VerticalAlign.Bottom)
-            .margin({ top: 10 })
-          }
-          .width('100%')
-          .padding(14)
-          .borderRadius(18)
-          .backgroundColor(AppTheme.surface)
-          .border({ width: 1, color: AppTheme.line })
-          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
-          .margin({ bottom: 20 })
-        }
-        .width('100%')
-        .padding({ left: 14, right: 14, top: 12 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppTheme.canvas)
-    .opacity(this.pageReady ? 1 : 0)
-    .translate({ y: this.pageReady ? 0 : 18 })
-    .animation({ duration: 320, curve: Curve.EaseOut })
-    .onAppear(() => {
-      this.pageReady = true;
-    })
+              }.width(142).height(142)
+              Column({ space: 13 }) {
+                ForEach(this.chartTypes, (type: EventType, index: number) => {
+                  Row({ space: 6 }) {
+                    Circle().width(7).height(7).fill(this.chartColors[index])
+                    Text(type).fontSize(11).fontColor(AppTheme.inkSoft).layoutWeight(1)
+                    Text(this.events.length === 0 ? '—' : Math.round(this.typeCount(type) / this.events.length * 100) + '%').fontSize(11).fontColor(AppTheme.muted)
+                  }.width('100%')
+                }, (type: EventType) => type)
+              }.layoutWeight(1)
+            }.width('100%')
+          }.width('100%').padding(14).backgroundColor(AppTheme.surface).borderRadius(12)
+          Column({ space: 12 }) {
+            this.sectionHeader('应急联系方式', '管理 ›')
+            Row({ space: 12 }) {
+              Image($r('app.media.ic_phone')).width(30).height(30).fillColor(AppTheme.accent)
+              Column({ space: 4 }) {
+                Text('校园应急联络').fontSize(14).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+                Text('查看或配置联系电话').fontSize(11).fontColor(AppTheme.muted)
+              }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+              Text('›').fontSize(22).fontColor(AppTheme.muted)
+            }.width('100%')
+          }.width('100%').padding(14).backgroundColor(AppTheme.surface).borderRadius(12)
+            .onClick(() => { this.pageStack.pushPath({ name: 'EmergencyContactPage' }); })
+          Button('一键求助  ·  应急联络').width('100%').height(54).fontSize(15).fontColor(Color.White).borderRadius(16)
+            .linearGradient({ angle: 120, colors: [['#479EFF', 0], ['#1451FF', 1]] })
+            .onClick(() => { this.pageStack.pushPath({ name: 'EmergencyContactPage' }); })
+        }.width('100%').padding({ left: 14, right: 14, bottom: 20 })
+      }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+    }.width('100%').height('100%').backgroundColor(AppTheme.canvas)
+      .onAppear(() => this.refreshData())
   }
 }

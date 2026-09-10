@@ -91,19 +91,19 @@ export struct AccountPage {
                   .fontColor(Color.White)
                 Text('系统角色：' + (this.getUser()?.role ?? '访客'))
                   .fontSize(11)
-                  .fontColor('#38BDF8')
+                  .fontColor('#B9DCF1')
               }
               .alignItems(HorizontalAlign.Start)
 
               Blank()
 
               Row({ space: 4 }) {
-                Row().width(6).height(6).borderRadius(3).backgroundColor('#34D399')
-                Text('加盐哈希保护').fontSize(10).fontColor('#A7F3D0')
+                Row().width(6).height(6).borderRadius(3).backgroundColor('#CFE6DC')
+                Text('加盐哈希保护').fontSize(10).fontColor('#CFE6DC')
               }
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
               .borderRadius(12)
-              .backgroundColor('rgba(16,185,129,0.18)')
+              .backgroundColor('rgba(36,112,91,0.24)')
             }
             .width('100%')
           }
@@ -112,7 +112,7 @@ export struct AccountPage {
           .padding(18)
           .borderRadius(18)
           .backgroundColor(AppTheme.accentDark)
-          .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
+          .border({ width: 1, color: 'rgba(185,220,241,0.32)' })
           .shadow({ radius: 10, color: AppTheme.cardShadow, offsetY: 2 })
 
           // 修改密码卡片
@@ -215,7 +215,7 @@ export struct AccountPage {
                     .padding(10)
                     .borderRadius(8)
                     .backgroundColor(AppTheme.amberSoft)
-                    .border({ width: 1, color: '#FCD34D' })
+                    .border({ width: 1, color: AppTheme.amber })
                   Text('请通过校内保密渠道送达指定人员，并在规定时间内完成初始化。')
                     .fontSize(9).fontColor(AppTheme.muted).width('100%')
                 }.width('100%').padding(12).borderRadius(12).backgroundColor(AppTheme.surfaceMuted)

@@ -60,23 +60,23 @@ export struct StudentSchedulePage {
 
   private bg(color: CourseColor): string {
     switch (color) {
-      case CourseColor.BLUE: return '#EFF6FF';
-      case CourseColor.GREEN: return '#ECFDF5';
-      case CourseColor.RED: return '#FEF2F2';
-      case CourseColor.ORANGE: return '#FFF7ED';
-      case CourseColor.PURPLE: return '#FAF5FF';
-      default: return '#F8FAFC';
+      case CourseColor.BLUE: return AppTheme.accentSoft;
+      case CourseColor.GREEN: return AppTheme.successSoft;
+      case CourseColor.RED: return AppTheme.dangerSoft;
+      case CourseColor.ORANGE: return AppTheme.amberSoft;
+      case CourseColor.PURPLE: return AppTheme.cyanSoft;
+      default: return AppTheme.surfaceMuted;
     }
   }
 
   private fg(color: CourseColor): string {
     switch (color) {
-      case CourseColor.BLUE: return '#2563EB';
-      case CourseColor.GREEN: return '#059669';
-      case CourseColor.RED: return '#DC2626';
-      case CourseColor.ORANGE: return '#D97706';
-      case CourseColor.PURPLE: return '#7C3AED';
-      default: return '#475569';
+      case CourseColor.BLUE: return AppTheme.accent;
+      case CourseColor.GREEN: return AppTheme.success;
+      case CourseColor.RED: return AppTheme.danger;
+      case CourseColor.ORANGE: return AppTheme.amber;
+      case CourseColor.PURPLE: return AppTheme.cyan;
+      default: return AppTheme.inkSoft;
     }
   }
 
@@ -438,11 +438,11 @@ export struct StudentSchedulePage {
 
         Row({ space: 8 }) {
           Text('颜色').fontSize(12).fontColor(AppTheme.muted).width(42)
-          this.colorChoice(CourseColor.BLUE, '#2563EB', '#EFF6FF')
-          this.colorChoice(CourseColor.GREEN, '#059669', '#ECFDF5')
-          this.colorChoice(CourseColor.RED, '#DC2626', '#FEF2F2')
-          this.colorChoice(CourseColor.ORANGE, '#D97706', '#FFF7ED')
-          this.colorChoice(CourseColor.PURPLE, '#7C3AED', '#FAF5FF')
+          this.colorChoice(CourseColor.BLUE, AppTheme.accent, AppTheme.accentSoft)
+          this.colorChoice(CourseColor.GREEN, AppTheme.success, AppTheme.successSoft)
+          this.colorChoice(CourseColor.RED, AppTheme.danger, AppTheme.dangerSoft)
+          this.colorChoice(CourseColor.ORANGE, AppTheme.amber, AppTheme.amberSoft)
+          this.colorChoice(CourseColor.PURPLE, AppTheme.cyan, AppTheme.cyanSoft)
         }
 
         Row({ space: 10 }) {
@@ -472,7 +472,7 @@ export struct StudentSchedulePage {
       .padding(18)
       .borderRadius(22)
       .backgroundColor(AppTheme.surface)
-      .shadow({ radius: 18, color: 'rgba(15,23,42,0.18)', offsetY: 8 })
+      .shadow({ radius: 18, color: AppTheme.cardShadow, offsetY: 8 })
       .align(Alignment.Bottom)
       .margin({ bottom: 18 })
     }
