@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { EmergencyContactService } from '../service/EmergencyContactService';
+import { AppTheme } from '../common/AppTheme';
 
 @Component
 export struct EmergencyContactPage {
@@ -45,98 +46,112 @@ export struct EmergencyContactPage {
       // 顶部标题栏
       Row() {
         Text('‹')
-          .fontSize(30)
-          .fontColor('#334155')
+          .fontSize(28)
+          .fontColor(AppTheme.inkSoft)
           .padding({ left: 4, right: 10 })
           .onClick(() => {
             this.pageStack.pop();
           })
 
-        Column() {
-          Text('应急联系方式')
-            .fontSize(18)
+        Column({ space: 2 }) {
+          Text('应急联络方式')
+            .fontSize(17)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#0F172A')
+            .fontColor(AppTheme.ink)
 
-          Text('仅打开系统短信编辑或拨号界面，由你确认后执行')
+          Text('快速联动系统短信与拨号界面 · 需人工确认触发')
             .fontSize(10)
-            .fontColor('#94A3B8')
-            .margin({ top: 2 })
+            .fontColor(AppTheme.muted)
         }
         .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
-      .padding({ left: 12, right: 16, top: 14, bottom: 10 })
-      .backgroundColor(Color.White)
+      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
+      .backgroundColor(AppTheme.surface)
+      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       Scroll() {
         Column({ space: 14 }) {
-          Column({ space: 8 }) {
-            Text('紧急联系电话')
-              .fontSize(13)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#334155')
-              .width('100%')
+          // 应急响应专线卡片
+          Column({ space: 10 }) {
+            Row({ space: 6 }) {
+              Row().width(4).height(12).borderRadius(2).backgroundColor(AppTheme.danger)
+              Text('本地紧急联络专线号码')
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ink)
+            }
+            .width('100%')
 
             TextInput({
-              placeholder: '请输入本地配置的紧急联系电话',
+              placeholder: '请输入 6—20 位有效电话号码（支持 + 号）',
               text: this.phone
             })
               .type(InputType.PhoneNumber)
               .width('100%')
-              .height(48)
-              .fontSize(14)
-              .borderRadius(14)
-              .backgroundColor('#F8FAFC')
-              .border({ width: 1, color: '#E2E8F0' })
-              .padding({ left: 14, right: 14 })
+              .height(44)
+              .fontSize(13)
+              .borderRadius(10)
+              .backgroundColor(AppTheme.surfaceMuted)
+              .border({ width: 1, color: AppTheme.line })
+              .padding({ left: 12, right: 12 })
               .onChange((value: string) => {
                 this.phone = value;
               })
           }
           .width('100%')
           .padding(16)
-          .borderRadius(18)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
-          .shadow({ radius: 10, color: 'rgba(15,23,42,0.04)', offsetY: 2 })
+          .borderRadius(16)
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
 
-          Column() {
-            Text('使用说明')
-              .fontSize(13)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#334155')
+          // 运行规范卡片
+          Column({ space: 8 }) {
+            Row({ space: 6 }) {
+              Row().width(4).height(12).borderRadius(2).backgroundColor(AppTheme.accent)
+              Text('安全防护机制与使用须知')
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ink)
+            }
+            .width('100%')
+
+            Text('1. 该号码仅保存在当前设备本地私有配置中，用于突发情况下的快速外呼与求助。')
+              .fontSize(11)
+              .fontColor(AppTheme.muted)
+              .lineHeight(17)
               .width('100%')
-              .margin({ bottom: 8 })
 
-            Text('该号码由当前设备本地保存，不代表已接入学校保卫处或真实应急平台。首页可分别打开短信编辑和拨号界面；应用不会自动发送短信或自动拨号。')
-              .fontSize(12)
-              .fontColor('#64748B')
-              .lineHeight(20)
+            Text('2. 首页的“求助短信”和“一键拨打”仅用于调起系统原生编辑与拨号面板，应用不会在后台静默扣费或自动呼叫，必须由用户核实并主动发出。')
+              .fontSize(11)
+              .fontColor(AppTheme.muted)
+              .lineHeight(17)
               .width('100%')
           }
           .width('100%')
           .padding(16)
-          .borderRadius(18)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
+          .borderRadius(16)
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
 
-          Button('保存')
+          Button('保存应急专线配置')
             .width('100%')
-            .height(48)
-            .borderRadius(14)
-            .backgroundColor('#2563EB')
+            .height(44)
+            .borderRadius(10)
+            .backgroundColor(AppTheme.accent)
             .fontColor(Color.White)
-            .fontSize(14)
+            .fontSize(13)
             .fontWeight(FontWeight.Bold)
-            .shadow({ radius: 12, color: 'rgba(37,99,235,0.3)', offsetY: 4 })
+            .shadow({ radius: 8, color: AppTheme.glowBlue, offsetY: 2 })
             .margin({ top: 4, bottom: 20 })
             .onClick(() => {
               this.save();
             })
         }
         .width('100%')
-        .padding({ left: 14, right: 14, top: 12 })
+        .padding({ left: 16, right: 16, top: 14 })
       }
       .width('100%')
       .layoutWeight(1)
@@ -144,9 +159,9 @@ export struct EmergencyContactPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F8FAFC')
+    .backgroundColor(AppTheme.canvas)
     .opacity(this.pageReady ? 1 : 0)
-    .translate({ y: this.pageReady ? 0 : 18 })
+    .translate({ y: this.pageReady ? 0 : 12 })
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
       this.pageReady = true;

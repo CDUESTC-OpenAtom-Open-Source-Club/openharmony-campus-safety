@@ -10,11 +10,18 @@ import {
 } from '../model/Task';
 import { EventService } from '../service/EventService';
 import { SafetyStatisticsService, SafetyStatisticsSnapshot } from '../service/SafetyStatisticsService';
+import { AppTheme } from '../common/AppTheme';
 
 interface BarItem {
   day: string;
   value: number;
   height: string;
+}
+
+interface DomainItem {
+  type: EventType;
+  label: string;
+  color: string;
 }
 
 @Component
@@ -24,6 +31,12 @@ export struct StatisticsPage {
   @State private pageReady: boolean = false;
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
+
+  private domains: DomainItem[] = [
+    { type: EventType.FIRE, label: '消防器材与通道', color: AppTheme.accent },
+    { type: EventType.ELECTRIC, label: '强弱电与实验室用电', color: AppTheme.success },
+    { type: EventType.FACILITY, label: '楼宇公共设施及门窗', color: AppTheme.amber }
+  ];
 
   private getPendingTaskCount(): number {
     return this.tasks.filter(
@@ -161,28 +174,101 @@ export struct StatisticsPage {
     this.tasks = EventService.getAllTasks().slice();
   }
 
+  @Builder
+  sectionHeader(title: string, tag: string) {
+    Row() {
+      Row()
+        .width(4)
+        .height(12)
+        .borderRadius(2)
+        .backgroundColor(AppTheme.accent)
+        .margin({ right: 6 })
+      Text(title)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppTheme.ink)
+      Blank()
+      if (tag !== '') {
+        Text(tag)
+          .fontSize(10)
+          .fontColor(AppTheme.muted)
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  metricItem(label: string, value: string) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(10)
+        .fontColor(AppTheme.muted)
+      Text(value)
+        .fontSize(14)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppTheme.ink)
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  domainMeter(item: DomainItem) {
+    Column({ space: 8 }) {
+      Row() {
+        Row()
+          .width(4)
+          .height(12)
+          .borderRadius(2)
+          .backgroundColor(item.color)
+          .margin({ right: 6 })
+        Text(item.label)
+          .fontSize(11)
+          .fontColor(AppTheme.inkSoft)
+          .layoutWeight(1)
+        Text(this.getDomainRateLabel(item.type))
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppTheme.ink)
+      }
+      .width('100%')
+
+      Row() {
+        Row()
+          .width(this.getDomainRate(item.type).toString() + '%')
+          .height(8)
+          .borderRadius(4)
+          .backgroundColor(item.color)
+      }
+      .width('100%')
+      .height(8)
+      .borderRadius(4)
+      .backgroundColor(AppTheme.surfaceMuted)
+    }
+    .width('100%')
+  }
+
   build() {
     Column() {
       // 顶部标题栏
       Row() {
         Text('‹')
-          .fontSize(30)
-          .fontColor('#334155')
+          .fontSize(28)
+          .fontColor(AppTheme.inkSoft)
           .padding({ left: 4, right: 10 })
           .onClick(() => {
             this.pageStack.pop();
           })
 
-        Column() {
+        Column({ space: 2 }) {
           Text('数据统计')
-            .fontSize(18)
+            .fontSize(17)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#0F172A')
+            .fontColor(AppTheme.ink)
 
           Text('校园安全态势综合量化分析')
             .fontSize(10)
-            .fontColor('#94A3B8')
-            .margin({ top: 2 })
+            .fontColor(AppTheme.muted)
         }
         .alignItems(HorizontalAlign.Start)
 
@@ -191,38 +277,47 @@ export struct StatisticsPage {
         Text('刷新')
           .fontSize(11)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#2563EB')
+          .fontColor(AppTheme.accent)
           .padding({ left: 11, right: 11, top: 5, bottom: 5 })
           .borderRadius(12)
-          .backgroundColor('#EFF6FF')
+          .backgroundColor(AppTheme.accentSoft)
+          .border({ width: 1, color: AppTheme.cyanSoft })
           .onClick(() => {
             this.refreshData();
           })
       }
       .width('100%')
-      .padding({ left: 12, right: 16, top: 14, bottom: 10 })
-      .backgroundColor(Color.White)
+      .padding({ left: 14, right: 16, top: 14, bottom: 12 })
+      .backgroundColor(AppTheme.surface)
+      .border({ width: { bottom: 1 }, color: AppTheme.line })
 
       Scroll() {
         Column({ space: 12 }) {
-          // 实时健康度卡片
+          // 实时健康度卡片 (现代冷色安全座舱)
           Column() {
             Row() {
-              Column() {
-                Text('实时健康度 ' + this.getHealthGrade(this.getHealthScore()))
-                  .fontSize(10)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#6EE7B7')
-                  .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                  .borderRadius(10)
-                  .backgroundColor('rgba(16,185,129,0.18)')
-                  .border({ width: 1, color: 'rgba(16,185,129,0.35)' })
+              Column({ space: 6 }) {
+                Row({ space: 6 }) {
+                  Row()
+                    .width(6)
+                    .height(6)
+                    .borderRadius(3)
+                    .backgroundColor('#38BDF8')
+                  Text('综合态势 · ' + this.getHealthGrade(this.getHealthScore()))
+                    .fontSize(10)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#38BDF8')
+                    .letterSpacing(0.5)
+                }
+                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                .borderRadius(6)
+                .backgroundColor('rgba(56,189,248,0.12)')
+                .border({ width: 1, color: 'rgba(56,189,248,0.25)' })
 
-                Text('校园安全运行态势')
-                  .fontSize(18)
+                Text('校园安全运行指数')
+                  .fontSize(19)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(Color.White)
-                  .margin({ top: 8 })
               }
               .alignItems(HorizontalAlign.Start)
 
@@ -230,103 +325,117 @@ export struct StatisticsPage {
 
               Column() {
                 Text(this.getHealthScoreText())
-                  .fontSize(14)
+                  .fontSize(16)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor('#6EE7B7')
+                  .fontColor('#38BDF8')
               }
-              .width(48)
-              .height(48)
-              .borderRadius(24)
-              .border({ width: 2, color: '#34D399' })
+              .width(52)
+              .height(52)
+              .borderRadius(26)
+              .border({ width: 2.5, color: AppTheme.info })
+              .backgroundColor('rgba(2,132,199,0.15)')
               .justifyContent(FlexAlign.Center)
             }
             .width('100%')
-            .margin({ bottom: 10 })
+            .margin({ bottom: 12 })
 
-            Text('平均首次响应：' + this.getAverageResponse())
-              .fontSize(11)
-              .fontColor('rgba(255,255,255,0.65)')
-              .width('100%')
+            Row() {
+              Text('平均首次响应：' + this.getAverageResponse())
+                .fontSize(11)
+                .fontColor('rgba(255,255,255,0.7)')
+
+              Blank()
+
+              Text('安全等级：' + this.getHealthGrade(this.getHealthScore()))
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('rgba(255,255,255,0.85)')
+            }
+            .width('100%')
+            .padding({ top: 10 })
+            .border({ width: { top: 1 }, color: 'rgba(255,255,255,0.12)' })
           }
           .width('100%')
-          .padding(16)
+          .padding(18)
           .borderRadius(20)
-          .linearGradient({
-            angle: 135,
-            colors: [['#0F172A', 0.0], ['#1E293B', 0.6], ['#312E81', 1.0]]
-          })
-          .shadow({ radius: 16, color: 'rgba(15,23,42,0.25)', offsetY: 6 })
+          .backgroundColor(AppTheme.accentDark)
+          .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
+          .shadow({ radius: 14, color: 'rgba(11,25,44,0.35)', offsetY: 6 })
 
-          // 真实状态指标
+          // 核心状态指标卡片
           Row({ space: 8 }) {
             Column() {
               Text('待确认')
                 .fontSize(10)
-                .fontColor('#94A3B8')
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.muted)
               Text(this.getStatistics().pendingEvents.toString())
-                .fontSize(20)
+                .fontSize(22)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#2563EB')
+                .fontColor(AppTheme.accent)
                 .margin({ top: 4 })
-              Text('需确认')
+              Text('需要核实')
                 .fontSize(9)
-                .fontColor('#94A3B8')
+                .fontColor(AppTheme.muted)
                 .margin({ top: 2 })
             }
             .layoutWeight(1)
             .padding(12)
             .borderRadius(14)
-            .backgroundColor(Color.White)
-            .border({ width: 1, color: '#E2E8F0' })
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: AppTheme.line })
+            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
 
             Column() {
               Text('处理中')
                 .fontSize(10)
-                .fontColor('#94A3B8')
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.muted)
               Text(this.getStatistics().processingEvents.toString())
-                .fontSize(20)
+                .fontSize(22)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#D97706')
+                .fontColor(AppTheme.amber)
                 .margin({ top: 4 })
-              Text('事件')
+              Text('正在处置')
                 .fontSize(9)
-                .fontColor('#94A3B8')
+                .fontColor(AppTheme.muted)
                 .margin({ top: 2 })
             }
             .layoutWeight(1)
             .padding(12)
             .borderRadius(14)
-            .backgroundColor(Color.White)
-            .border({ width: 1, color: '#E2E8F0' })
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: AppTheme.line })
+            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
 
             Column() {
               Text('待审核')
                 .fontSize(10)
-                .fontColor('#94A3B8')
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.muted)
               Text(this.getStatistics().reviewEvents.toString())
-                .fontSize(20)
+                .fontSize(22)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#059669')
+                .fontColor(AppTheme.success)
                 .margin({ top: 4 })
-              Text('事件')
+              Text('整改完毕')
                 .fontSize(9)
-                .fontColor('#94A3B8')
+                .fontColor(AppTheme.muted)
                 .margin({ top: 2 })
             }
             .layoutWeight(1)
             .padding(12)
             .borderRadius(14)
-            .backgroundColor(Color.White)
-            .border({ width: 1, color: '#E2E8F0' })
+            .backgroundColor(AppTheme.surface)
+            .border({ width: 1, color: AppTheme.line })
+            .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
           }
           .width('100%')
 
-          Column({ space: 8 }) {
-            Text('处置效率')
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontColor('#334155')
-              .width('100%')
+          // 处置效率看板
+          Column({ space: 10 }) {
+            this.sectionHeader('处置效率与质量', '实时计算')
+
             Row({ space: 8 }) {
               this.metricItem('已完成', this.getStatistics().completedEvents.toString())
               this.metricItem('超时任务', this.getStatistics().overdueTasks.toString())
@@ -338,149 +447,52 @@ export struct StatisticsPage {
           .width('100%')
           .padding(14)
           .borderRadius(18)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
 
-          // 各领域达标率（按真实事件闭环率计算）
+          // 各重点安防领域达标率
           Column({ space: 12 }) {
-            Row() {
-              Text('各重点安防领域达标率')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#334155')
-              Blank()
-              Text('实时计算')
-                .fontSize(10)
-                .fontColor('#94A3B8')
-            }
-            .width('100%')
+            this.sectionHeader('各重点安防领域达标率', '实时计算')
 
-            Column({ space: 8 }) {
-              Row() {
-                Text('消防器材与通道')
-                  .fontSize(11)
-                  .fontColor('#475569')
-                  .layoutWeight(1)
-                Text(this.getDomainRateLabel(EventType.FIRE))
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#334155')
-              }
-              .width('100%')
-
-              Row() {
-                Row()
-                  .width(this.getDomainRate(EventType.FIRE).toString() + '%')
-                  .height(8)
-                  .borderRadius(4)
-                  .backgroundColor('#2563EB')
-              }
-              .width('100%')
-              .height(8)
-              .borderRadius(4)
-              .backgroundColor('#F1F5F9')
-            }
-            .width('100%')
-
-            Column({ space: 8 }) {
-              Row() {
-                Text('强弱电与实验室用电')
-                  .fontSize(11)
-                  .fontColor('#475569')
-                  .layoutWeight(1)
-                Text(this.getDomainRateLabel(EventType.ELECTRIC))
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#334155')
-              }
-              .width('100%')
-
-              Row() {
-                Row()
-                  .width(this.getDomainRate(EventType.ELECTRIC).toString() + '%')
-                  .height(8)
-                  .borderRadius(4)
-                  .backgroundColor('#10B981')
-              }
-              .width('100%')
-              .height(8)
-              .borderRadius(4)
-              .backgroundColor('#F1F5F9')
-            }
-            .width('100%')
-
-            Column({ space: 8 }) {
-              Row() {
-                Text('楼宇公共设施及门窗')
-                  .fontSize(11)
-                  .fontColor('#475569')
-                  .layoutWeight(1)
-                Text(this.getDomainRateLabel(EventType.FACILITY))
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#334155')
-              }
-              .width('100%')
-
-              Row() {
-                Row()
-                  .width(this.getDomainRate(EventType.FACILITY).toString() + '%')
-                  .height(8)
-                  .borderRadius(4)
-                  .backgroundColor('#F59E0B')
-              }
-              .width('100%')
-              .height(8)
-              .borderRadius(4)
-              .backgroundColor('#F1F5F9')
-            }
-            .width('100%')
+            ForEach(this.domains, (item: DomainItem) => {
+              this.domainMeter(item)
+            }, (item: DomainItem) => item.type)
           }
           .width('100%')
           .padding(14)
           .borderRadius(18)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
 
           // 近 7 日事件趋势（按实际报告时间统计）
           Column() {
-            Row() {
-              Text('近 7 日事件办结趋势')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#334155')
-              Blank()
-              Text('实时')
-                .fontSize(10)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#059669')
-            }
-            .width('100%')
-            .margin({ bottom: 10 })
+            this.sectionHeader('近 7 日事件办结趋势', '实时')
 
             Row() {
               ForEach(this.getLast7Days(), (item: BarItem) => {
                 Column() {
                   Text(item.value.toString())
                     .fontSize(9)
-                    .fontColor('#94A3B8')
+                    .fontColor(AppTheme.muted)
                   Column() {
                     Column()
                       .width('100%')
                       .height(item.height)
                       .borderRadius({ topLeft: 4, topRight: 4 })
-                      .backgroundColor('#2563EB')
+                      .backgroundColor(AppTheme.accent)
                   }
                   .width(14)
                   .height(56)
                   .borderRadius({ topLeft: 4, topRight: 4 })
-                  .backgroundColor('#F1F5F9')
+                  .backgroundColor(AppTheme.surfaceMuted)
                   .justifyContent(FlexAlign.End)
                   .margin({ top: 4 })
 
                   Text(item.day)
                     .fontSize(9)
-                    .fontColor('#64748B')
+                    .fontColor(AppTheme.muted)
                     .margin({ top: 4 })
                 }
                 .layoutWeight(1)
@@ -490,12 +502,14 @@ export struct StatisticsPage {
             .width('100%')
             .height(96)
             .alignItems(VerticalAlign.Bottom)
+            .margin({ top: 10 })
           }
           .width('100%')
           .padding(14)
           .borderRadius(18)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
+          .backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
           .margin({ bottom: 20 })
         }
         .width('100%')
@@ -507,22 +521,12 @@ export struct StatisticsPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F8FAFC')
+    .backgroundColor(AppTheme.canvas)
     .opacity(this.pageReady ? 1 : 0)
     .translate({ y: this.pageReady ? 0 : 18 })
     .animation({ duration: 320, curve: Curve.EaseOut })
     .onAppear(() => {
       this.pageReady = true;
     })
-  }
-
-  @Builder
-  private metricItem(label: string, value: string) {
-    Column({ space: 4 }) {
-      Text(label).fontSize(10).fontColor('#64748B')
-      Text(value).fontSize(14).fontWeight(FontWeight.Bold).fontColor('#0F172A')
-    }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start)
   }
 }

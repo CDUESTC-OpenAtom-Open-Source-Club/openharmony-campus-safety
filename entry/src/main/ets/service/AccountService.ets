@@ -109,29 +109,23 @@ export class AccountService {
     return AccountService.currentUser;
   }
 
-  /** 首次安装仅允许设备持有人建立一个管理员；不预置或暴露任何默认口令。 */
+  /**
+   * 端侧空库不再承担生产管理员创建职责。
+   * 管理员应由后续组织服务或受控内部流程授予，避免“安装即管理员”。
+   */
   static async bootstrapAdministrator(username: string, name: string, password: string): Promise<LoginResult> {
-    if (AccountService.accounts.length > 0) {
-      return { success: false, message: '管理员初始化已完成，请使用现有账号登录' };
-    }
-    const validation: string = AccountService.validateAccountInput(username, name, password);
-    if (validation !== '') {
-      return { success: false, message: validation };
-    }
-    const account: StoredAccount = AccountService.createAccount(
-      AccountService.createUserId('admin'), username.trim().toLowerCase(), name.trim(), UserRole.ADMIN, password
-    );
-    AccountService.accounts = [account];
-    AccountService.currentUser = account.user;
-    await AccountService.persistAccounts();
-    await AccountService.persistCurrentUserId();
-    return { success: true, message: '管理员初始化完成', user: account.user };
+    return { success: false, message: '当前版本不支持端侧管理员初始化，请使用普通成员注册或受控内部开通' };
   }
 
   /** 公开注册仅创建普通用户，管理员和巡检账号必须由管理员受控创建。 */
-  static async registerUser(username: string, name: string, password: string, role: UserRole): Promise<LoginResult> {
+  static async registerUser(
+    username: string, name: string, password: string, role: UserRole, confirmPassword?: string
+  ): Promise<LoginResult> {
     if (role !== UserRole.STUDENT && role !== UserRole.TEACHER) {
       return { success: false, message: '公开注册只支持学生或教师身份' };
+    }
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return { success: false, message: '两次输入的密码不一致，请重新确认' };
     }
     const validation: string = AccountService.validateAccountInput(username, name, password);
     if (validation !== '') {
@@ -145,11 +139,13 @@ export class AccountService {
     );
     AccountService.accounts.push(account);
     await AccountService.persistAccounts();
-    return { success: true, message: '注册成功，请使用新账号登录', user: account.user };
+    AccountService.currentUser = account.user;
+    await AccountService.persistCurrentUserId();
+    return { success: true, message: '注册成功，已安全登录', user: account.user };
   }
 
   static needsAdministratorBootstrap(): boolean {
-    return AccountService.accounts.length === 0;
+    return false;
   }
 
   static isLoggedIn(): boolean {
@@ -319,6 +315,14 @@ export class AccountService {
     AccountService.currentUser = user;
   }
 
+  /** 仅供 Hypium 隔离账户用例；不会触碰设备 Preferences。 */
+  static resetForTest(): void {
+    AccountService.accounts = [];
+    AccountService.invitations = [];
+    AccountService.currentUser = null;
+    AccountService.pref = null;
+  }
+
   private static createAccount(
     id: string,
     username: string,
@@ -391,7 +395,7 @@ export class AccountService {
   private static derivePassword(password: string, salt: Uint8Array): string {
     const kdf: cryptoFramework.Kdf = cryptoFramework.createKdf('PBKDF2|SHA256');
     const spec: cryptoFramework.PBKDF2Spec = {
-      algName: 'PBKDF2|SHA256',
+      algName: 'PBKDF2',
       password: password,
       salt: salt,
       iterations: AccountService.ITERATIONS,

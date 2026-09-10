@@ -5,8 +5,8 @@ import { ReportPage } from './ReportPage';
 import { StatisticsPage } from './StatisticsPage';
 import { EmergencyContactPage } from './EmergencyContactPage';
 import { StudentSchedulePage } from './StudentSchedulePage';
-import { LoginPage } from './LoginPage';
 import { AccountPage } from './AccountPage';
+import { ProfilePage } from './ProfilePage';
 import { Course } from '../model/Course';
 import { ScheduleService } from '../service/ScheduleService';
 import {
@@ -25,6 +25,7 @@ import { AppPermission, PermissionService } from '../service/PermissionService';
 import { User, UserRole } from '../model/User';
 import { promptAction } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
+import { AppTheme } from '../common/AppTheme';
 
 @Entry
 @Component
@@ -35,18 +36,15 @@ struct Index {
   @State private loggedIn: boolean = AccountService.isLoggedIn();
   @StorageLink('emergencyPhone') private emergencyPhone: string = '';
 
-  // 开屏动画控制
+  // 开屏动画控制：保留现有启动流程，但视觉改为安静的品牌引导。
   @State private splashVisible: boolean = true;
   @State private splashOpacity: number = 0;
-  @State private splashScale: number = 0.6;
-  @State private splashOffsetY: number = 20;
+  @State private splashScale: number = 0.92;
+  @State private splashOffsetY: number = 18;
   @State private splashProgress: number = 0;
   @State private splashStepText: string = '正在初始化安防引擎...';
 
-  // 首页入场动效
   @State private homeReady: boolean = false;
-
-  // 数据
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
   @State private scheduleCourses: Course[] = [];
@@ -59,32 +57,42 @@ struct Index {
   private timerProgress2: number = -1;
   private timerProgress3: number = -1;
 
+  aboutToAppear(): void {
+    this.refreshEmergencyPhone();
+    this.refreshSchedule();
+  }
+
   aboutToDisappear(): void {
-    if (this.timerEnter !== -1) {
-      clearTimeout(this.timerEnter);
-    }
-    if (this.timerExit !== -1) {
-      clearTimeout(this.timerExit);
-    }
-    if (this.timerFinish !== -1) {
-      clearTimeout(this.timerFinish);
-    }
-    if (this.timerProgress1 !== -1) {
-      clearTimeout(this.timerProgress1);
-    }
-    if (this.timerProgress2 !== -1) {
-      clearTimeout(this.timerProgress2);
-    }
-    if (this.timerProgress3 !== -1) {
-      clearTimeout(this.timerProgress3);
-    }
+    if (this.timerEnter !== -1) clearTimeout(this.timerEnter);
+    if (this.timerExit !== -1) clearTimeout(this.timerExit);
+    if (this.timerFinish !== -1) clearTimeout(this.timerFinish);
+    if (this.timerProgress1 !== -1) clearTimeout(this.timerProgress1);
+    if (this.timerProgress2 !== -1) clearTimeout(this.timerProgress2);
+    if (this.timerProgress3 !== -1) clearTimeout(this.timerProgress3);
+  }
+
+  onPageShow(): void {
+    this.refreshEmergencyPhone();
+    this.refreshSchedule();
+    this.loggedIn = AccountService.isLoggedIn();
   }
 
   private navigateTo(name: string): void {
+    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage') {
+      this.showLoginRequiredDialog();
+      return;
+    }
+    if (name === 'SchedulePage') {
+      this.currentTab = name;
+      this.showSchedulePage = true;
+      return;
+    }
     if (name === 'TaskPage' && !this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
+      promptAction.showToast({ message: '当前账号暂无处置任务权限' });
       return;
     }
     if (name === 'StatisticsPage' && !this.can(AppPermission.VIEW_STATISTICS)) {
+      promptAction.showToast({ message: '当前账号暂无数据统计权限' });
       return;
     }
     this.currentTab = name;
@@ -119,6 +127,18 @@ struct Index {
     this.loggedIn = false;
   }
 
+  private showLoginRequiredDialog(): void {
+    AlertDialog.show({
+      title: '登录后即可使用该功能',
+      message: '访客模式支持浏览首页。请先登录；如没有账号，可在“我”页面注册普通成员账号。',
+      primaryButton: {
+        value: '去登录 / 注册',
+        action: () => this.navigateTo('ProfilePage')
+      },
+      secondaryButton: { value: '暂不登录', action: () => {} }
+    });
+  }
+
   private refreshSchedule(): void {
     const context = getContext(this) as common.Context;
     ScheduleService.getCourses(context).then((items: Course[]) => {
@@ -138,266 +158,200 @@ struct Index {
   }
 
   private showEmergencyConfigDialog(): void {
+    if (!this.loggedIn) {
+      this.showLoginRequiredDialog();
+      return;
+    }
     AlertDialog.show({
       title: '尚未配置有效紧急联系电话',
       message: '请先配置 6—20 位有效电话号码。该号码仅保存在本机，不代表已接入学校或真实应急平台。',
       primaryButton: {
         value: '去配置',
-        action: () => {
-          this.pageStack.pushPath({ name: 'EmergencyContactPage' });
-        }
+        action: () => this.pageStack.pushPath({ name: 'EmergencyContactPage' })
       },
-      secondaryButton: {
-        value: '取消',
-        action: () => {
-        }
-      }
+      secondaryButton: { value: '取消', action: () => {} }
     });
   }
 
   private getConfiguredEmergencyPhone(): string {
     const phone: string = this.emergencyPhone.trim();
-    return EmergencyContactService.isValidPhone(phone) ?
-      EmergencyContactService.normalizePhone(phone) : '';
+    return EmergencyContactService.isValidPhone(phone) ? EmergencyContactService.normalizePhone(phone) : '';
   }
 
   private openEmergencySms(): void {
+    if (!this.loggedIn) {
+      this.showLoginRequiredDialog();
+      return;
+    }
     const phone: string = this.getConfiguredEmergencyPhone();
     if (phone === '') {
       this.showEmergencyConfigDialog();
       return;
     }
     const context = getContext(this) as common.UIAbilityContext;
-    const body: string = '校园安全紧急求助：请立即联系我。';
     const want: Want = {
       action: 'ohos.want.action.sendSms',
-      uri: 'sms:' + phone + '?body=' + encodeURIComponent(body)
+      uri: 'sms:' + phone + '?body=' + encodeURIComponent('校园安全紧急求助：请立即联系我。')
     };
-    context.startAbility(want).catch((err: Error) => {
+    context.startAbility(want).catch(() => {
       promptAction.showToast({ message: '无法打开短信编辑界面，请手动联系 ' + phone });
     });
   }
 
   private openEmergencyDialer(): void {
+    if (!this.loggedIn) {
+      this.showLoginRequiredDialog();
+      return;
+    }
     const phone: string = this.getConfiguredEmergencyPhone();
     if (phone === '') {
       this.showEmergencyConfigDialog();
       return;
     }
     const context = getContext(this) as common.UIAbilityContext;
-    const want: Want = {
-      action: 'ohos.want.action.dial',
-      uri: 'tel:' + phone
-    };
-    context.startAbility(want).catch((err: Error) => {
+    const want: Want = { action: 'ohos.want.action.dial', uri: 'tel:' + phone };
+    context.startAbility(want).catch(() => {
       promptAction.showToast({ message: '无法打开拨号界面，请手动拨打 ' + phone });
     });
   }
 
-  onPageShow(): void {
-    this.refreshEmergencyPhone();
-    this.refreshSchedule();
-  }
-
   private getUrgentCount(): number {
-    const urgent: SecurityEvent[] = this.events.filter(
-      (event: SecurityEvent) =>
-        event.priority === EventPriority.URGENT ||
-        event.priority === EventPriority.HIGH
-    );
-    return urgent.length;
+    return this.events.filter((event: SecurityEvent) =>
+      event.priority === EventPriority.URGENT || event.priority === EventPriority.HIGH
+    ).length;
   }
 
   private getPendingTaskCount(): number {
-    const pending: Task[] = this.tasks.filter(
-      (task: Task) =>
-        task.status === TaskStatus.PENDING ||
-        task.status === TaskStatus.PROCESSING
-    );
-    return pending.length;
+    return this.tasks.filter((task: Task) =>
+      task.status === TaskStatus.PENDING || task.status === TaskStatus.PROCESSING
+    ).length;
   }
 
   private getHealthScore(): number {
     let penalty: number = 0;
     this.events.forEach((event: SecurityEvent) => {
-      if (
-        event.status === EventStatus.PENDING ||
-        event.status === EventStatus.CONFIRMED
-      ) {
-        if (event.priority === EventPriority.URGENT) {
-          penalty += 18;
-        } else if (event.priority === EventPriority.HIGH) {
-          penalty += 12;
-        } else if (event.priority === EventPriority.MEDIUM) {
-          penalty += 8;
-        } else {
-          penalty += 4;
-        }
+      if (event.status === EventStatus.PENDING || event.status === EventStatus.CONFIRMED) {
+        penalty += event.priority === EventPriority.URGENT ? 18 :
+          event.priority === EventPriority.HIGH ? 12 :
+          event.priority === EventPriority.MEDIUM ? 8 : 4;
       } else if (event.status === EventStatus.PROCESSING) {
         penalty += 4;
       }
     });
     this.tasks.forEach((task: Task) => {
-      if (task.status === TaskStatus.PENDING) {
-        penalty += 6;
-      } else if (task.status === TaskStatus.PROCESSING) {
-        penalty += 3;
-      }
+      if (task.status === TaskStatus.PENDING) penalty += 6;
+      else if (task.status === TaskStatus.PROCESSING) penalty += 3;
     });
-    const score: number = Math.max(55, Math.min(100, 100 - penalty));
-    return Math.round(score * 10) / 10;
+    return Math.round(Math.max(55, Math.min(100, 100 - penalty)) * 10) / 10;
   }
 
   private getStatusColor(status: EventStatus): string {
-    if (status === EventStatus.PENDING) {
-      return '#EA580C';
-    } else if (status === EventStatus.CONFIRMED) {
-      return '#1B6EFF';
-    } else if (status === EventStatus.PROCESSING) {
-      return '#6366F1';
-    } else if (status === EventStatus.COMPLETED) {
-      return '#16A34A';
-    }
-    return '#64748B';
+    if (status === EventStatus.PENDING) return AppTheme.amber;
+    if (status === EventStatus.CONFIRMED) return AppTheme.info;
+    if (status === EventStatus.PROCESSING) return AppTheme.accent;
+    if (status === EventStatus.COMPLETED) return AppTheme.success;
+    return AppTheme.muted;
   }
 
   @Builder
   pageMap(name: string) {
     if (name === 'EventPage') {
-      NavDestination() {
-        EventPage({
-          pageStack: this.pageStack
-        })
-      }
-      .title('安全事件')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+      NavDestination() { EventPage({ pageStack: this.pageStack }) }
+        .title('安全事件').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'EventDetailPage') {
-      NavDestination() {
-        EventDetailPage({
-          pageStack: this.pageStack
-        })
-      }
-      .title('事件详情')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+      NavDestination() { EventDetailPage({ pageStack: this.pageStack }) }
+        .title('事件详情').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'TaskPage') {
-      NavDestination() {
-        TaskPage({
-          pageStack: this.pageStack
-        })
-      }
-      .title('处置任务')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+      NavDestination() { TaskPage({ pageStack: this.pageStack }) }
+        .title('处置任务').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'ReportPage') {
       NavDestination() {
         ReportPage({
           pageStack: this.pageStack,
-          onReported: (): void => {
-            this.events = EventService.getAllEvents().slice();
-          }
+          onReported: (): void => { this.events = EventService.getAllEvents().slice(); }
         })
       }
-      .title('隐患上报')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+        .title('隐患上报').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'StatisticsPage') {
-      NavDestination() {
-        StatisticsPage({
-          pageStack: this.pageStack
-        })
-      }
-      .title('数据统计')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+      NavDestination() { StatisticsPage({ pageStack: this.pageStack }) }
+        .title('数据统计').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'EmergencyContactPage') {
-      NavDestination() {
-        EmergencyContactPage({
-          pageStack: this.pageStack
-        })
-      }
-      .title('应急联系方式')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+      NavDestination() { EmergencyContactPage({ pageStack: this.pageStack }) }
+        .title('应急联系方式').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'AccountPage') {
       NavDestination() {
-        AccountPage({
-          pageStack: this.pageStack,
-          onLogout: (): void => this.completeLogout()
+        AccountPage({ pageStack: this.pageStack, onLogout: (): void => this.completeLogout() })
+      }
+        .title('账号与安全').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+    } else if (name === 'ProfilePage') {
+      NavDestination() {
+        ProfilePage({
+          onLogin: (): void => {
+            this.loggedIn = true;
+            this.events = EventService.getAllEvents().slice();
+            this.tasks = EventService.getAllTasks().slice();
+          },
+          onLogout: (): void => this.completeLogout(),
+          onManageAccount: (): void => this.navigateTo('AccountPage')
         })
       }
-      .title('账号与安全')
-      .hideTitleBar(true)
-      .systemTransition(NavigationSystemTransitionType.FADE)
+        .title('我').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     }
   }
 
   @Builder
-  bentoCard(
+  private serviceTile(
     title: string,
     desc: string,
     badge: string,
-    badgeColor: string,
-    iconBg: string,
-    iconColor: string,
     icon: Resource,
+    tone: string,
+    softTone: string,
     route: string
   ) {
-    Column() {
+    Column({ space: 10 }) {
       Row() {
         Row() {
-          Image(icon)
-            .width(22)
-            .height(22)
-            .fillColor(iconColor)
+          Image(icon).width(20).height(20).fillColor(tone)
         }
-        .width(42)
-        .height(42)
-        .borderRadius(14)
-        .backgroundColor(iconBg)
-        .justifyContent(FlexAlign.Center)
-
+        .width(40).height(40).borderRadius(12).backgroundColor(softTone).justifyContent(FlexAlign.Center)
         Blank()
-
         Text(badge)
           .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(badgeColor)
-          .backgroundColor('#F8FAFC')
-          .padding({ left: 7, right: 7, top: 3, bottom: 3 })
-          .borderRadius(8)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(tone)
+          .backgroundColor(softTone)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .borderRadius(6)
       }
       .width('100%')
-      .margin({ bottom: 10 })
 
       Text(title)
         .fontSize(15)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#0F172A')
+        .fontColor(AppTheme.ink)
         .width('100%')
 
       Text(desc)
         .fontSize(11)
-        .fontColor('#94A3B8')
+        .fontColor(AppTheme.muted)
         .width('100%')
-        .margin({ top: 3 })
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .width('100%')
+    .layoutWeight(1)
+    .height(136)
     .padding(14)
-    .borderRadius(18)
-    .backgroundColor(Color.White)
-    .border({ width: 1, color: '#E2E8F0' })
-    .shadow({ radius: 10, color: 'rgba(15,23,42,0.04)', offsetY: 2 })
-    .onClick(() => {
-      this.navigateTo(route);
-    })
+    .borderRadius(16)
+    .backgroundColor(AppTheme.surface)
+    .border({ width: 1, color: AppTheme.line })
+    .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
+    .onClick(() => this.navigateTo(route))
   }
 
   private getHomeCourses(): Course[] {
-    const today: number = this.getCurrentWeekday();
     return this.scheduleCourses
-      .filter((course: Course) => course.weekday === today)
+      .filter((course: Course) => course.weekday === this.getCurrentWeekday())
       .sort((a: Course, b: Course) => a.startPeriod - b.startPeriod)
       .slice(0, 3);
   }
@@ -408,170 +362,197 @@ struct Index {
   }
 
   private getCurrentWeekdayLabel(): string {
-    const labels: string[] = ['一', '二', '三', '四', '五', '六', '日'];
-    return '周' + labels[this.getCurrentWeekday() - 1];
+    return '周' + ['一', '二', '三', '四', '五', '六', '日'][this.getCurrentWeekday() - 1];
   }
 
   @Builder
-  scheduleSection() {
-    Column({ space: 10 }) {
+  private emergencyStrip() {
+    Row() {
       Row() {
-        Row({ space: 7 }) {
-          Row()
-            .width(32)
-            .height(32)
-            .borderRadius(10)
-            .linearGradient({
-              angle: 135,
-              colors: [['#2563EB', 0.0], ['#60A5FA', 1.0]]
-            })
-            .justifyContent(FlexAlign.Center)
+        Row().width(8).height(8).borderRadius(4).backgroundColor(AppTheme.danger)
+      }
+      .width(28).height(28).borderRadius(8).backgroundColor(AppTheme.dangerSoft)
+      .justifyContent(FlexAlign.Center)
+      .margin({ right: 10 })
 
-          Text('我的课表')
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#334155')
+      Column({ space: 3 }) {
+        Row({ space: 6 }) {
+          Text('应急响应专线').fontSize(13).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          Text('快速联动').fontSize(9).fontColor(AppTheme.danger)
+            .padding({ left: 5, right: 5, top: 1, bottom: 1 })
+            .borderRadius(4).backgroundColor(AppTheme.dangerSoft)
         }
-
-        Blank()
-
-        Text('查看完整课表 ›')
+        Text(this.emergencyPhone === '' ? '未配置，点击设置应急联系电话' : this.emergencyPhone)
           .fontSize(11)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#2563EB')
-          .onClick(() => {
-            this.showSchedulePage = true;
-          })
+          .fontColor(this.emergencyPhone === '' ? AppTheme.muted : AppTheme.inkSoft)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
-      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      .onClick(() => this.navigateTo('EmergencyContactPage'))
 
-      Column({ space: 0 }) {
-        Row() {
-          Text('今日 · ' + this.getCurrentWeekdayLabel())
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
-            .fontColor('#2563EB')
-            .backgroundColor('#EFF6FF')
-            .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-            .borderRadius(10)
-
-          Blank()
-
-          Text('共 ' + this.getHomeCourses().length + ' 节')
-            .fontSize(10)
-            .fontColor('#94A3B8')
-        }
-        .width('100%')
-        .margin({ bottom: 2 })
-
-        if (this.getHomeCourses().length === 0) {
-          Text('今日暂无课程，点击此处添加课程')
-            .fontSize(12)
-            .fontColor('#94A3B8')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .padding({ top: 18, bottom: 18 })
-        }
-
-        ForEach(this.getHomeCourses(), (course: Course, index: number) => {
-          this.homeCourseRow(
-            course.startTime,
-            '第' + course.startPeriod + '-' + course.endPeriod + '节',
-            course.name,
-            course.location,
-            index === 0 ? '进行中' : '待上课',
-            index === 0 ? '#ECFDF5' : '#EFF6FF',
-            index === 0 ? '#059669' : '#2563EB',
-            index === 0
-          )
-        }, (course: Course) => course.id)
+      Row({ space: 8 }) {
+        Button('求助短信')
+          .type(ButtonType.Normal).height(32).fontSize(11).fontWeight(FontWeight.Medium)
+          .fontColor(AppTheme.danger)
+          .backgroundColor(AppTheme.dangerSoft).borderRadius(8).onClick(() => this.openEmergencySms())
+        Button('一键拨打')
+          .type(ButtonType.Normal).height(32).fontSize(11).fontWeight(FontWeight.Medium)
+          .fontColor(Color.White)
+          .backgroundColor(AppTheme.danger).borderRadius(8).onClick(() => this.openEmergencyDialer())
       }
-      .width('100%')
-      .padding(14)
-      .borderRadius(20)
-      .backgroundColor(Color.White)
-      .shadow({ radius: 12, color: 'rgba(15,23,42,0.05)', offsetY: 2 })
-      .onClick(() => {
-        this.showSchedulePage = true;
-      })
-
+      .margin({ left: 10 })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 16 })
-    .opacity(this.homeReady ? 1 : 0)
-    .translate({ y: this.homeReady ? 0 : 20 })
-    .animation({ duration: 460, curve: Curve.EaseOut, delay: 380 })
+    .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+    .borderRadius(16)
+    .backgroundColor(AppTheme.surface)
+    .border({ width: 1, color: AppTheme.line })
+    .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
   }
 
   @Builder
-  homeCourseRow(
-    time: string,
-    period: string,
-    name: string,
-    location: string,
-    status: string,
-    statusBg: string,
-    statusColor: string,
-    active: boolean
-  ) {
+  private courseRow(course: Course, active: boolean) {
     Row() {
       Column({ space: 2 }) {
-        Text(time)
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#334155')
-        Text(period)
-          .fontSize(9)
-          .fontColor('#94A3B8')
+        Text(course.startTime).fontSize(13).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+        Text('第' + course.startPeriod + '-' + course.endPeriod + '节').fontSize(10).fontColor(AppTheme.muted)
       }
-      .width(56)
+      .width(62)
       .alignItems(HorizontalAlign.Start)
 
       Column({ space: 3 }) {
-        Text(name)
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#334155')
-        Text('⌖ ' + location)
-          .fontSize(10)
-          .fontColor('#94A3B8')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(course.name).fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.ink)
+        Text('教学点 · ' + course.location).fontSize(11).fontColor(AppTheme.muted)
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      Text((active ? '● ' : '') + status)
-        .fontSize(9)
+      Text(active ? '进行中' : '待上课')
+        .fontSize(10)
         .fontWeight(FontWeight.Medium)
-        .fontColor(statusColor)
-        .backgroundColor(statusBg)
-        .padding({ left: 8, right: 8, top: 5, bottom: 5 })
-        .borderRadius(10)
+        .fontColor(active ? AppTheme.success : AppTheme.info)
+        .backgroundColor(active ? AppTheme.successSoft : AppTheme.infoSoft)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .borderRadius(6)
     }
     .width('100%')
-    .padding({ top: 11, bottom: 11 })
-    .border({ width: { bottom: 1 }, color: '#F1F5F9' })
+    .padding({ top: 10, bottom: 10 })
+    .border({ width: { bottom: 1 }, color: AppTheme.line })
   }
 
   @Builder
-  tabItem(key: string, label: string, icon: Resource) {
-    Column() {
+  private scheduleSection() {
+    Column({ space: 10 }) {
+      Row() {
+        Column({ space: 2 }) {
+          Text('今日课程安排').fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+          Text(this.getCurrentWeekdayLabel() + ' · 共 ' + this.getHomeCourses().length + ' 门课程')
+            .fontSize(11).fontColor(AppTheme.muted)
+        }
+        .alignItems(HorizontalAlign.Start)
+        Blank()
+        Text('完整课表 ›')
+          .fontSize(11).fontWeight(FontWeight.Medium).fontColor(AppTheme.accent)
+          .onClick(() => this.navigateTo('SchedulePage'))
+      }
+      .width('100%')
+
+      Column() {
+        if (this.getHomeCourses().length === 0) {
+          Text('今日暂无课程安排')
+            .fontSize(12).fontColor(AppTheme.muted).width('100%')
+            .textAlign(TextAlign.Center).padding({ top: 18, bottom: 18 })
+        } else {
+          ForEach(this.getHomeCourses(), (course: Course, index: number) => {
+            this.courseRow(course, index === 0)
+          }, (course: Course) => course.id)
+        }
+      }
+      .width('100%')
+      .padding({ left: 14, right: 14 })
+      .borderRadius(14)
+      .backgroundColor(AppTheme.surface)
+      .border({ width: 1, color: AppTheme.line })
+      .onClick(() => this.navigateTo('SchedulePage'))
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 16, bottom: 20 })
+  }
+
+  @Builder
+  private recentEvents() {
+    Column({ space: 10 }) {
+      Row() {
+        Text(this.isPersonalUser() ? '我的最新上报' : '实时流转事件')
+          .fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+        Blank()
+        Text('查看全部 ›').fontSize(11).fontWeight(FontWeight.Medium).fontColor(AppTheme.accent)
+          .onClick(() => this.navigateTo('EventPage'))
+      }
+      .width('100%')
+
+      if (this.events.length === 0) {
+        Row() {
+          Text('当前暂无流转事件，校园运行平稳').fontSize(12).fontColor(AppTheme.muted)
+        }
+        .width('100%').height(68).justifyContent(FlexAlign.Center)
+        .borderRadius(14).backgroundColor(AppTheme.surface).border({ width: 1, color: AppTheme.line })
+      } else {
+        ForEach(this.events.slice(0, 2), (event: SecurityEvent) => {
+          Row() {
+            Row().width(7).height(7).borderRadius(4).backgroundColor(this.getStatusColor(event.status))
+            Column({ space: 4 }) {
+              Text(event.title).fontSize(13).fontWeight(FontWeight.Medium).fontColor(AppTheme.ink)
+                .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text(event.location + ' · ' + event.reportTime).fontSize(10).fontColor(AppTheme.muted)
+                .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .layoutWeight(1).alignItems(HorizontalAlign.Start).margin({ left: 10 })
+
+            Text(event.status)
+              .fontSize(10)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.getStatusColor(event.status))
+              .backgroundColor(AppTheme.surfaceMuted)
+              .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+              .borderRadius(6)
+          }
+          .width('100%').padding(13).borderRadius(14).backgroundColor(AppTheme.surface)
+          .border({ width: 1, color: AppTheme.line })
+          .shadow({ radius: 6, color: AppTheme.cardShadow, offsetY: 2 })
+          .margin({ bottom: 8 })
+          .onClick(() => {
+            if (!this.loggedIn) {
+              this.showLoginRequiredDialog();
+              return;
+            }
+            EventService.setSelectedEventId(event.id);
+            this.currentTab = 'EventPage';
+            this.pageStack.pushPath({ name: 'EventDetailPage' });
+          })
+        }, (event: SecurityEvent) => event.id)
+      }
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 16 })
+  }
+
+  @Builder
+  private tabItem(key: string, label: string, icon: Resource) {
+    Column({ space: 4 }) {
       Image(icon)
-        .width(20)
-        .height(20)
-        .fillColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
+        .width(20).height(20)
+        .fillColor(this.currentTab === key ? AppTheme.accent : AppTheme.muted)
       Text(label)
         .fontSize(10)
         .fontWeight(this.currentTab === key ? FontWeight.Bold : FontWeight.Normal)
-        .fontColor(this.currentTab === key ? '#1B6EFF' : '#94A3B8')
-        .margin({ top: 2 })
+        .fontColor(this.currentTab === key ? AppTheme.accent : AppTheme.muted)
     }
     .layoutWeight(1)
     .justifyContent(FlexAlign.Center)
-    .onClick(() => {
-      this.navigateTo(key);
-    })
+    .onClick(() => this.navigateTo(key))
   }
 
   private startSplash(): void {
@@ -580,679 +561,325 @@ struct Index {
       this.splashScale = 1;
       this.splashOffsetY = 0;
     });
-
-    // 进度条从 0 丝滑连续生长到 100%，避免分段跳变
     this.getUIContext().animateTo({ duration: 1500, curve: Curve.EaseOut }, () => {
       this.splashProgress = 100;
     });
-
-    this.timerProgress1 = setTimeout(() => {
-      this.splashStepText = '正在加载本地安全数据...';
-    }, 400);
-    this.timerProgress2 = setTimeout(() => {
-      this.splashStepText = '正在准备协同处置工作台...';
-    }, 900);
-    this.timerProgress3 = setTimeout(() => {
-      this.splashStepText = '鸿蒙智安已就绪';
-    }, 1450);
-
+    this.timerProgress1 = setTimeout(() => this.splashStepText = '正在加载本地安全数据与规则库...', 400);
+    this.timerProgress2 = setTimeout(() => this.splashStepText = '正在连接网格化安防协同控制台...', 900);
+    this.timerProgress3 = setTimeout(() => this.splashStepText = '智安核心引擎就绪 · 防护在线', 1450);
     this.timerExit = setTimeout(() => {
       this.getUIContext().animateTo({ duration: 450, curve: Curve.EaseIn }, () => {
         this.splashOpacity = 0;
-        this.splashScale = 0.92;
+        this.splashScale = 0.96;
       });
     }, 1850);
-
     this.timerFinish = setTimeout(() => {
-      this.getUIContext().animateTo({ duration: 500, curve: Curve.EaseOut }, () => {
-        this.homeReady = true;
-      });
+      this.getUIContext().animateTo({ duration: 500, curve: Curve.EaseOut }, () => this.homeReady = true);
       this.splashVisible = false;
     }, 2350);
   }
 
   private skipSplash(): void {
-    if (this.timerProgress1 !== -1) {
-      clearTimeout(this.timerProgress1);
-    }
-    if (this.timerProgress2 !== -1) {
-      clearTimeout(this.timerProgress2);
-    }
-    if (this.timerProgress3 !== -1) {
-      clearTimeout(this.timerProgress3);
-    }
-    if (this.timerExit !== -1) {
-      clearTimeout(this.timerExit);
-    }
-    if (this.timerFinish !== -1) {
-      clearTimeout(this.timerFinish);
-    }
+    if (this.timerProgress1 !== -1) clearTimeout(this.timerProgress1);
+    if (this.timerProgress2 !== -1) clearTimeout(this.timerProgress2);
+    if (this.timerProgress3 !== -1) clearTimeout(this.timerProgress3);
+    if (this.timerExit !== -1) clearTimeout(this.timerExit);
+    if (this.timerFinish !== -1) clearTimeout(this.timerFinish);
     this.homeReady = true;
     this.splashVisible = false;
   }
 
   build() {
-    if (!this.loggedIn) {
-      LoginPage({
-        onLogin: (): void => {
-          this.loggedIn = true;
-          this.events = EventService.getAllEvents().slice();
-          this.tasks = EventService.getAllTasks().slice();
-        }
-      })
-    } else {
-      Stack() {
+    Stack() {
       Column() {
-        Navigation(this.pageStack) {
-          Scroll() {
+        if (this.showSchedulePage) {
+          StudentSchedulePage({ showSchedulePage: $showSchedulePage })
+            .width('100%').layoutWeight(1)
+        } else {
+          Navigation(this.pageStack) {
             Column() {
-              // ========================
-              // 顶部品牌与安全状态
-              // ========================
-              Row() {
-                Row() {
-                  Image($r('app.media.ic_shield_check'))
-                    .width(22)
-                    .height(22)
-                    .fillColor(Color.White)
-                }
-                .width(42)
-                .height(42)
-                .borderRadius(14)
-                .linearGradient({
-                  angle: 135,
-                  colors: [['#2563EB', 0.0], ['#6366F1', 1.0]]
-                })
-                .justifyContent(FlexAlign.Center)
-                .shadow({ radius: 12, color: 'rgba(37,99,235,0.3)', offsetY: 4 })
-
-                Column() {
+              Scroll() {
+                Column({ space: 0 }) {
+                  // 顶部导航与品牌状态栏
                   Row() {
-                    Text('鸿蒙智安')
-                      .fontSize(20)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#0F172A')
+                    Row() {
+                      Image($r('app.media.ic_shield_check')).width(22).height(22).fillColor(Color.White)
+                    }
+                    .width(42).height(42).borderRadius(13).backgroundColor(AppTheme.accent)
+                    .justifyContent(FlexAlign.Center)
 
-                    Text('NEXT')
-                      .fontSize(9)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#2563EB')
-                      .backgroundColor('#DBEAFE')
-                      .padding({ left: 5, right: 5, top: 2, bottom: 2 })
-                      .borderRadius(6)
-                      .margin({ left: 6 })
-                  }
-
-                  Text('智慧校园 · 安全协同平台')
-                    .fontSize(11)
-                    .fontColor('#64748B')
-                    .margin({ top: 2 })
-                }
-                .alignItems(HorizontalAlign.Start)
-                .margin({ left: 10 })
-
-                Blank()
-
-                Row({ space: 5 }) {
-                  Text(this.currentUser()?.role ?? '')
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor('#1D4ED8')
-                }
-                .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-                .borderRadius(16)
-                .backgroundColor('#EFF6FF')
-                .border({ width: 1, color: '#BFDBFE' })
-                .onClick(() => this.navigateTo('AccountPage'))
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 16, bottom: 12 })
-
-              // ========================
-              // 智慧安防总览卡片
-              // ========================
-              Column() {
-                Row() {
-                  Text('综合安全指数 ' + this.getHealthScore().toString())
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(Color.White)
-                    .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                    .borderRadius(12)
-                    .backgroundColor('rgba(255,255,255,0.18)')
-                    .border({ width: 1, color: 'rgba(255,255,255,0.25)' })
-
-                  Blank()
-
-                  Text('今日实时播报')
-                    .fontSize(11)
-                    .fontColor('rgba(255,255,255,0.75)')
-                }
-                .width('100%')
-                .margin({ bottom: 12 })
-
-                Row() {
-                  Column() {
-                    Text(this.events.length.toString())
-                      .fontSize(20)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Color.White)
-                    Text('安全事件')
-                      .fontSize(10)
-                      .fontColor('rgba(255,255,255,0.75)')
-                      .margin({ top: 2 })
-                  }
-                  .layoutWeight(1)
-
-                  Column() {
-                    Text(this.getUrgentCount().toString())
-                      .fontSize(20)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#FCD34D')
-                    Text('高危预警')
-                      .fontSize(10)
-                      .fontColor('rgba(255,255,255,0.75)')
-                      .margin({ top: 2 })
-                  }
-                  .layoutWeight(1)
-                  .border({
-                    width: { left: 1, right: 1 },
-                    color: 'rgba(255,255,255,0.15)'
-                  })
-
-                  Column() {
-                    Text(this.getPendingTaskCount().toString())
-                      .fontSize(20)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#6EE7B7')
-                    Text('在办任务')
-                      .fontSize(10)
-                      .fontColor('rgba(255,255,255,0.75)')
-                      .margin({ top: 2 })
-                  }
-                  .layoutWeight(1)
-                }
-                .width('100%')
-                .padding({ top: 10, bottom: 10 })
-
-                Text('当前安防网络运行正常')
-                  .fontSize(11)
-                  .fontColor('rgba(255,255,255,0.8)')
-                  .width('100%')
-                  .margin({ top: 8 })
-              }
-              .width('100%')
-              .padding(16)
-              .borderRadius(20)
-              .linearGradient({
-                angle: 135,
-                colors: [['#2563EB', 0.0], ['#1E40AF', 0.6], ['#312E81', 1.0]]
-              })
-              .shadow({ radius: 18, color: 'rgba(37,99,235,0.28)', offsetY: 8 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 16 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 80 })
-              .margin({ left: 16, right: 16 })
-
-              // ========================
-              // 本地配置的应急求助
-              // ========================
-              Row() {
-                Column({ space: 6 }) {
-                  Row({ space: 6 }) {
-                    Row()
-                      .width(7)
-                      .height(7)
-                      .borderRadius(4)
-                      .backgroundColor('#EF4444')
-                    Text('应急联系方式')
-                      .fontSize(12)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#1E293B')
+                    Column({ space: 3 }) {
+                      Row({ space: 6 }) {
+                        Text('鸿蒙智安').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+                        Row({ space: 4 }) {
+                          Row().width(6).height(6).borderRadius(3).backgroundColor('#10B981')
+                          Text('守护中').fontSize(9).fontWeight(FontWeight.Medium).fontColor('#059669')
+                        }
+                        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                        .borderRadius(10).backgroundColor(AppTheme.successSoft)
+                      }
+                      Text('智慧校园安全协同平台').fontSize(11).fontColor(AppTheme.muted)
+                    }
+                    .alignItems(HorizontalAlign.Start).margin({ left: 10 })
 
                     Blank()
 
-                    Text('配置 ›')
-                      .fontSize(10)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor('#2563EB')
+                    Row({ space: 4 }) {
+                      Text(this.loggedIn ? (this.currentUser()?.name ?? '账户') : '登录')
+                        .fontSize(11).fontWeight(FontWeight.Medium).fontColor(AppTheme.accent)
+                      Text(this.loggedIn ? (this.currentUser()?.role ?? '') : '访客')
+                        .fontSize(9).fontColor(AppTheme.muted)
+                    }
+                    .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                    .borderRadius(12).backgroundColor(AppTheme.accentSoft)
+                    .border({ width: 1, color: AppTheme.cyanSoft })
+                    .onClick(() => this.navigateTo('ProfilePage'))
                   }
-                  .width('100%')
+                  .width('100%').padding({ left: 16, right: 16, top: 16, bottom: 12 })
 
-                  Text(
-                    this.emergencyPhone === ''
-                      ? '未配置，点击设置紧急联系电话'
-                      : this.emergencyPhone
-                  )
-                    .fontSize(12)
-                    .fontColor(this.emergencyPhone === '' ? '#94A3B8' : '#334155')
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
-                .onClick(() => {
-                  this.pageStack.pushPath({ name: 'EmergencyContactPage' });
-                })
-
-                Column({ space: 6 }) {
-                  Button('编辑短信')
-                    .type(ButtonType.Normal)
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#DC2626')
-                    .backgroundColor('#FEF2F2')
-                    .borderRadius(12)
-                    .height(34)
-                    .padding({ left: 12, right: 12 })
-                    .onClick(() => this.openEmergencySms())
-                  Button('拨打电话')
-                    .type(ButtonType.Normal)
-                    .fontSize(11)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#B45309')
-                    .backgroundColor('#FFF7ED')
-                    .borderRadius(12)
-                    .height(34)
-                    .padding({ left: 12, right: 12 })
-                    .onClick(() => this.openEmergencyDialer())
-                }
-                .margin({ left: 10 })
-              }
-              .width('100%')
-              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-              .borderRadius(16)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E2E8F0' })
-              .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 16 })
-              .animation({ duration: 420, curve: Curve.EaseOut, delay: 160 })
-              .margin({ left: 16, right: 16, top: 12 })
-
-              // ========================
-              // 业务协同 Bento 网格
-              // ========================
-              Row() {
-                Text('业务协同与处置中心')
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#64748B')
-                Blank()
-                Text('本地数据实时汇总')
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#2563EB')
-              }
-              .width('100%')
-              .padding({ left: 18, right: 18, top: 18, bottom: 8 })
-
-              Row() {
-                Column({ space: 10 }) {
-                  this.bentoCard(
-                    this.isPersonalUser() ? '我的上报' : '安全事件',
-                    this.isPersonalUser() ? '查看处理进度与反馈' : '核查、确权与指派',
-                    this.events.length.toString() + ' 件',
-                    '#2563EB',
-                    '#EFF6FF',
-                    '#2563EB',
-                    $r('app.media.ic_event'),
-                    'EventPage'
-                  )
-                  this.bentoCard(
-                    '隐患上报',
-                    '随手拍与一键提交',
-                    '秒级直达',
-                    '#059669',
-                    '#ECFDF5',
-                    '#059669',
-                    $r('app.media.ic_report'),
-                    'ReportPage'
-                  )
-                }
-                .layoutWeight(1)
-
-                Column({ space: 10 }) {
-                  if (this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
-                    this.bentoCard(
-                      '处置任务',
-                      '巡检维保现场接单',
-                      this.getPendingTaskCount().toString() + ' 待办',
-                      '#D97706',
-                      '#FFF7ED',
-                      '#D97706',
-                      $r('app.media.ic_task'),
-                      'TaskPage'
-                    )
-                  }
-                  if (this.can(AppPermission.VIEW_STATISTICS)) {
-                    this.bentoCard(
-                      '数据统计',
-                      '安全全景量化分析',
-                      '态势洞察',
-                      '#7C3AED',
-                      '#FAF5FF',
-                      '#7C3AED',
-                      $r('app.media.ic_stats'),
-                      'StatisticsPage'
-                    )
-                  }
-                }
-                .layoutWeight(1)
-              }
-              .width('100%')
-              .padding({ left: 16, right: 16 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 20 })
-              .animation({ duration: 460, curve: Curve.EaseOut, delay: 240 })
-
-              // ========================
-              // 最新流转事件
-              // ========================
-              Row() {
-                Text(this.isPersonalUser() ? '我的最新上报' : '最新流转事件')
-                  .fontSize(12)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor('#334155')
-                Blank()
-                Text('查看全部 ›')
-                  .fontSize(11)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#2563EB')
-                  .onClick(() => {
-                    this.navigateTo('EventPage');
-                  })
-              }
-              .width('100%')
-              .padding({ left: 18, right: 18, top: 18, bottom: 8 })
-
-              Column({ space: 10 }) {
-                if (this.events.length === 0) {
-                  Row() {
-                    Text('暂无流转事件，等待首次发现')
-                      .fontSize(12)
-                      .fontColor('#94A3B8')
-                  }
-                  .width('100%')
-                  .padding(14)
-                  .borderRadius(16)
-                  .backgroundColor(Color.White)
-                  .border({ width: 1, color: '#E2E8F0' })
-                  .justifyContent(FlexAlign.Center)
-                } else {
-                  ForEach(this.events.slice(0, 2), (event: SecurityEvent) => {
+                  // 综合安全态势驾驶舱卡片
+                  Column() {
                     Row() {
-                      Row()
-                        .width(8)
-                        .height(8)
-                        .borderRadius(4)
-                        .backgroundColor('#2563EB')
-
-                      Column() {
-                        Text(event.title)
-                          .fontSize(13)
-                          .fontWeight(FontWeight.Bold)
-                          .fontColor('#334155')
-                          .maxLines(1)
-                          .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(event.location)
-                          .fontSize(11)
-                          .fontColor('#94A3B8')
-                          .margin({ top: 3 })
-                          .maxLines(1)
-                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      Column({ space: 4 }) {
+                        Text('CAMPUS SAFETY INDEX')
+                          .fontSize(9).fontWeight(FontWeight.Bold).fontColor('rgba(255,255,255,0.6)')
+                        Row({ space: 8 }) {
+                          Text(this.getHealthScore().toString())
+                            .fontSize(36).fontWeight(FontWeight.Bold).fontColor(Color.White)
+                          Column({ space: 2 }) {
+                            Text('分').fontSize(13).fontColor('rgba(255,255,255,0.8)')
+                            Text('状态良好').fontSize(10).fontColor('#34D399')
+                              .backgroundColor('rgba(52,211,153,0.18)').padding({ left: 5, right: 5, top: 1, bottom: 1 })
+                              .borderRadius(4)
+                          }
+                        }
+                        Text('实时综合防御指数').fontSize(11).fontColor('rgba(255,255,255,0.7)')
                       }
                       .alignItems(HorizontalAlign.Start)
-                      .layoutWeight(1)
-                      .margin({ left: 10 })
 
-                      Text(event.status)
-                        .fontSize(10)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor(this.getStatusColor(event.status))
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .borderRadius(8)
-                        .backgroundColor('#F8FAFC')
+                      Blank()
+
+                      Column({ space: 5 }) {
+                        Row({ space: 4 }) {
+                          Row().width(7).height(7).borderRadius(4).backgroundColor('#34D399')
+                          Text('全域监控在线').fontSize(11).fontWeight(FontWeight.Medium).fontColor('#A7F3D0')
+                        }
+                        Text('本地高可用网络').fontSize(10).fontColor('rgba(255,255,255,0.6)')
+                      }
+                      .alignItems(HorizontalAlign.End)
                     }
                     .width('100%')
-                    .padding(12)
-                    .borderRadius(16)
-                    .backgroundColor(Color.White)
-                    .border({ width: 1, color: '#E2E8F0' })
-                    .shadow({ radius: 8, color: 'rgba(15,23,42,0.03)', offsetY: 2 })
-                    .onClick(() => {
-                      EventService.setSelectedEventId(event.id);
-                      this.currentTab = 'EventPage';
-                      this.pageStack.pushPath({ name: 'EventDetailPage' });
-                    })
-                  }, (event: SecurityEvent) => event.id)
+
+                    // 遥测三栏数据行
+                    Row() {
+                      Column({ space: 3 }) {
+                        Text(this.events.length.toString()).fontSize(18).fontWeight(FontWeight.Bold).fontColor(Color.White)
+                        Text('流转事件').fontSize(10).fontColor('rgba(255,255,255,0.65)')
+                      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+
+                      Row().width(1).height(24).backgroundColor('rgba(255,255,255,0.15)')
+
+                      Column({ space: 3 }) {
+                        Text(this.getUrgentCount().toString()).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#FCD34D')
+                        Text('高危预警').fontSize(10).fontColor('rgba(255,255,255,0.65)')
+                      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+
+                      Row().width(1).height(24).backgroundColor('rgba(255,255,255,0.15)')
+
+                      Column({ space: 3 }) {
+                        Text(this.getPendingTaskCount().toString()).fontSize(18).fontWeight(FontWeight.Bold).fontColor('#38BDF8')
+                        Text('在办任务').fontSize(10).fontColor('rgba(255,255,255,0.65)')
+                      }.layoutWeight(1).alignItems(HorizontalAlign.End)
+                    }
+                    .width('100%').margin({ top: 16 }).padding({ top: 12 })
+                    .border({ width: { top: 1 }, color: 'rgba(255,255,255,0.12)' })
+                  }
+                  .width('100%').padding(18).borderRadius(18).backgroundColor(AppTheme.accentDark)
+                  .border({ width: 1, color: 'rgba(56,189,248,0.2)' })
+                  .shadow({ radius: 14, color: 'rgba(11,25,44,0.16)', offsetY: 4 })
+                  .opacity(this.homeReady ? 1 : 0)
+                  .translate({ y: this.homeReady ? 0 : 12 })
+                  .animation({ duration: 420, curve: Curve.EaseOut, delay: 80 })
+                  .margin({ left: 16, right: 16 })
+
+                  // 应急联络专线带
+                  Column() {
+                    this.emergencyStrip()
+                  }
+                  .width('100%')
+                  .opacity(this.homeReady ? 1 : 0)
+                  .translate({ y: this.homeReady ? 0 : 12 })
+                  .animation({ duration: 420, curve: Curve.EaseOut, delay: 140 })
+                  .padding({ left: 16, right: 16, top: 12 })
+
+                  // 快捷入口标题
+                  Row() {
+                    Text('核心服务专区').fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppTheme.ink)
+                    Blank()
+                    Text('网格化协同').fontSize(11).fontColor(AppTheme.muted)
+                  }
+                  .width('100%').padding({ left: 16, right: 16, top: 18, bottom: 10 })
+
+                  // 6大业务卡片矩阵
+                  Column({ space: 10 }) {
+                    Row({ space: 10 }) {
+                      this.serviceTile(
+                        this.isPersonalUser() ? '我的上报' : '安全事件',
+                        this.isPersonalUser() ? '处理进度与反馈' : '隐患核查与流转',
+                        this.events.length.toString() + ' 项',
+                        $r('app.media.ic_event'), AppTheme.accent, AppTheme.accentSoft, 'EventPage'
+                      )
+                      this.serviceTile(
+                        '隐患上报', '快速登记一键提交', '即刻上报',
+                        $r('app.media.ic_report'), AppTheme.cyan, AppTheme.cyanSoft, 'ReportPage'
+                      )
+                    }
+                    .width('100%')
+
+                    Row({ space: 10 }) {
+                      this.serviceTile(
+                        '我的课表', '今日作息与课程安排', this.getHomeCourses().length + ' 节',
+                        $r('app.media.ic_calendar'), AppTheme.info, AppTheme.infoSoft, 'SchedulePage'
+                      )
+                      this.serviceTile(
+                        '应急联络', '紧急专线与求助方式', '安全保障',
+                        $r('app.media.ic_phone'), AppTheme.danger, AppTheme.dangerSoft, 'EmergencyContactPage'
+                      )
+                    }
+                    .width('100%')
+
+                    Row({ space: 10 }) {
+                      this.serviceTile(
+                        '处置任务',
+                        this.can(AppPermission.VIEW_ASSIGNED_TASKS) ? '现场接单与验收闭环' : '登录后查看指派任务',
+                        this.can(AppPermission.VIEW_ASSIGNED_TASKS) ? this.getPendingTaskCount() + ' 待办' : '需权限',
+                        $r('app.media.ic_task'), AppTheme.amber, AppTheme.amberSoft, 'TaskPage'
+                      )
+                      this.serviceTile(
+                        '数据统计',
+                        this.can(AppPermission.VIEW_STATISTICS) ? '校园安全态势综合分析' : '登录后查看安全洞察',
+                        this.can(AppPermission.VIEW_STATISTICS) ? '态势洞察' : '需权限',
+                        $r('app.media.ic_stats'), AppTheme.accentDeep, AppTheme.accentSoft, 'StatisticsPage'
+                      )
+                    }
+                    .width('100%')
+                  }
+                  .width('100%').padding({ left: 16, right: 16 })
+                  .opacity(this.homeReady ? 1 : 0)
+                  .translate({ y: this.homeReady ? 0 : 16 })
+                  .animation({ duration: 440, curve: Curve.EaseOut, delay: 200 })
+
+                  // 流转事件与课表
+                  Column() {
+                    this.recentEvents()
+                  }
+                  .width('100%')
+                  .opacity(this.homeReady ? 1 : 0)
+                  .translate({ y: this.homeReady ? 0 : 16 })
+                  .animation({ duration: 440, curve: Curve.EaseOut, delay: 260 })
+
+                  this.scheduleSection()
                 }
+                .width('100%')
+                .padding({ bottom: 16 })
               }
-              .width('100%')
-              .padding({ left: 16, right: 16, bottom: 20 })
-              .opacity(this.homeReady ? 1 : 0)
-              .translate({ y: this.homeReady ? 0 : 20 })
-              .animation({ duration: 460, curve: Curve.EaseOut, delay: 320 })
-
-              // ========================
-              // 我的课表
-              // ========================
-              this.scheduleSection()
+              .width('100%').layoutWeight(1).backgroundColor(AppTheme.canvas).scrollBar(BarState.Off)
             }
-            .width('100%')
+            .width('100%').height('100%')
           }
-          .width('100%')
-          .height('100%')
-          .backgroundColor('#F8FAFC')
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .navDestination(this.pageMap)
+          .width('100%').layoutWeight(1).navDestination(this.pageMap)
 
-        // ========================
-        // 底部 TabBar：课表二级页按设计稿隐藏
-        // ========================
-        if (!this.showSchedulePage) {
+          // 底部导航栏
           Row() {
-          this.tabItem('Index', '首页', $r('app.media.ic_home'))
-          this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件', $r('app.media.ic_event'))
-
-          Column() {
-            Row() {
-              Image($r('app.media.ic_report'))
-                .width(20)
-                .height(20)
-                .fillColor(Color.White)
-            }
-            .width(46)
-            .height(46)
-            .borderRadius(23)
-            .linearGradient({
-              angle: 135,
-              colors: [['#2563EB', 0.0], ['#6366F1', 1.0]]
-            })
-            .justifyContent(FlexAlign.Center)
-            .shadow({ radius: 12, color: 'rgba(37,99,235,0.35)', offsetY: 4 })
-
-            Text('上报')
-              .fontSize(10)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('#2563EB')
-              .margin({ top: 2 })
+            this.tabItem('Index', '首页', $r('app.media.ic_home'))
+            this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件', $r('app.media.ic_event'))
+            this.tabItem('ReportPage', '上报', $r('app.media.ic_report'))
+            this.tabItem('SchedulePage', '课表', $r('app.media.ic_calendar'))
+            this.tabItem('ProfilePage', '我', $r('app.media.ic_account'))
           }
-          .width(56)
-          .justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            this.navigateTo('ReportPage');
-          })
-
-          if (this.can(AppPermission.VIEW_ASSIGNED_TASKS)) {
-            this.tabItem('TaskPage', '任务', $r('app.media.ic_task'))
-          }
-          if (this.can(AppPermission.VIEW_STATISTICS)) {
-            this.tabItem('StatisticsPage', '统计', $r('app.media.ic_stats'))
-          }
-        }
-        .width('100%')
-          .height(62)
-          .backgroundColor(Color.White)
-          .border({ width: 1, color: '#E2E8F0' })
+          .width('100%').height(64).backgroundColor(AppTheme.surface)
+          .border({ width: { top: 1 }, color: AppTheme.line })
+          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: -2 })
         }
       }
-      .width('100%')
-      .height('100%')
+      .width('100%').height('100%').backgroundColor(AppTheme.canvas)
 
-      // ========================
-      // 学生课表二级页：在当前 App 内覆盖打开，不使用外部 Ability
-      // ========================
-      if (this.showSchedulePage) {
-        StudentSchedulePage({
-          showSchedulePage: $showSchedulePage
-        })
-          .width('100%')
-          .height('100%')
-      }
-
-      // ========================
-      // 启动开屏动画
-      // ========================
+      // 开屏科技初始化动效层
       if (this.splashVisible) {
         Column() {
-          // 跳过按钮
           Row() {
             Blank()
-            Text('跳过 ›')
-              .fontSize(11)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('rgba(255,255,255,0.8)')
-              .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-              .borderRadius(14)
-              .backgroundColor('rgba(255,255,255,0.1)')
-              .border({ width: 1, color: 'rgba(255,255,255,0.15)' })
-              .onClick(() => {
-                this.skipSplash();
-              })
+            Text('跳过')
+              .fontSize(11).fontColor('rgba(255,255,255,0.75)')
+              .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+              .borderRadius(14).border({ width: 1, color: 'rgba(255,255,255,0.2)' })
+              .backgroundColor('rgba(255,255,255,0.06)')
+              .onClick(() => this.skipSplash())
           }
-          .width('100%')
-          .padding({ top: 56, right: 20 })
+          .width('100%').padding({ top: 52, right: 20 })
 
-          // 品牌徽章 + 雷达光环
-          Stack({ alignContent: Alignment.Center }) {
-            Column()
-              .width(128)
-              .height(128)
-              .borderRadius(64)
-              .border({ width: 1, color: 'rgba(96,165,250,0.4)' })
-              .scale({ x: this.splashScale, y: this.splashScale })
-
-            Column()
-              .width(104)
-              .height(104)
-              .borderRadius(52)
-              .border({ width: 1, color: 'rgba(129,140,248,0.3)' })
-              .scale({ x: this.splashScale, y: this.splashScale })
-
-            Row() {
-              Image($r('app.media.ic_shield'))
-                .width(44)
-                .height(44)
-                .fillColor(Color.White)
+          Column({ space: 22 }) {
+            // 科技护盾徽章及同心圆
+            Stack() {
+              Row()
+                .width(108).height(108).borderRadius(54)
+                .border({ width: 1, color: 'rgba(56,189,248,0.25)' })
+              Row()
+                .width(92).height(92).borderRadius(46)
+                .backgroundColor('rgba(37,99,235,0.18)')
+              Row() {
+                Image($r('app.media.ic_shield'))
+                  .width(42).height(42).fillColor(Color.White)
+              }
+              .width(72).height(72).borderRadius(22).backgroundColor(AppTheme.accent)
+              .justifyContent(FlexAlign.Center)
+              .shadow({ radius: 20, color: 'rgba(37,99,235,0.4)', offsetY: 4 })
             }
-            .width(92)
-            .height(92)
-            .borderRadius(28)
-            .linearGradient({
-              angle: 135,
-              colors: [['#3B82F6', 0.0], ['#6366F1', 1.0]]
-            })
-            .justifyContent(FlexAlign.Center)
-            .shadow({ radius: 24, color: 'rgba(59,130,246,0.45)', offsetY: 10 })
             .scale({ x: this.splashScale, y: this.splashScale })
             .opacity(this.splashOpacity)
-          }
-          .width(140)
-          .height(140)
 
-          // 品牌名称
-          Row() {
-            Text('鸿蒙智安')
-              .fontSize(28)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
-            Text('NEXT')
-              .fontSize(9)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
-              .backgroundColor('rgba(255,255,255,0.18)')
-              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-              .borderRadius(6)
-              .margin({ left: 8 })
-          }
-          .margin({ top: 24 })
-          .opacity(this.splashOpacity)
-          .translate({ y: this.splashOffsetY })
-
-          Text('智慧校园 · 安全敏捷协同平台')
-            .fontSize(12)
-            .fontColor('rgba(255,255,255,0.65)')
-            .margin({ top: 8, bottom: 28 })
-            .opacity(this.splashOpacity)
-            .translate({ y: this.splashOffsetY })
-
-          // 进度条与状态文案
-          Column() {
-            Row() {
-              Row()
-                .width(this.splashProgress * 1.8)
-                .height(5)
-                .borderRadius(3)
-                .linearGradient({
-                  angle: 90,
-                  colors: [['#60A5FA', 0.0], ['#818CF8', 1.0]]
-                })
-            }
-            .width(180)
-            .height(5)
-            .borderRadius(3)
-            .backgroundColor('rgba(255,255,255,0.12)')
-
-            Row() {
-              Text(this.splashStepText)
-                .fontSize(10)
-                .fontColor('rgba(255,255,255,0.55)')
-                .layoutWeight(1)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Text(Math.round(this.splashProgress).toString() + '%')
-                .fontSize(10)
+            Column({ space: 8 }) {
+              Text('鸿蒙智安')
+                .fontSize(28)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#93C5FD')
+                .fontColor(Color.White)
+                .letterSpacing(1)
+              Text('CAMPUS INTELLIGENT SAFETY SYSTEM')
+                .fontSize(9)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('rgba(255,255,255,0.5)')
+              Text('智慧校园安全协同平台')
+                .fontSize(12)
+                .fontColor('rgba(255,255,255,0.7)')
             }
-            .width(180)
-            .margin({ top: 8 })
-          }
-          .opacity(this.splashOpacity)
+            .opacity(this.splashOpacity).translate({ y: this.splashOffsetY })
 
-          // 底部认证
-          Text('HarmonyOS NEXT 驱动 · 敏捷响应 闭环协同')
-            .fontSize(10)
-            .fontColor('rgba(255,255,255,0.35)')
-            .margin({ top: 90 })
+            Column({ space: 10 }) {
+              // 科技感进度指示条
+              Row() {
+                Row().width(this.splashProgress * 1.8).height(4).borderRadius(2).backgroundColor('#38BDF8')
+              }
+              .width(180).height(4).borderRadius(2).backgroundColor('rgba(255,255,255,0.12)')
+
+              Row() {
+                Text(this.splashStepText).fontSize(10).fontColor('rgba(255,255,255,0.65)').layoutWeight(1)
+                Text(Math.round(this.splashProgress) + '%').fontSize(11).fontWeight(FontWeight.Bold).fontColor('#38BDF8')
+              }
+              .width(180)
+            }
+            .opacity(this.splashOpacity).translate({ y: this.splashOffsetY })
+          }
+          .justifyContent(FlexAlign.Center)
+
+          Blank()
+          Text('本地端侧安全数据引擎 · 全流程协同闭环')
+            .fontSize(10).fontColor('rgba(255,255,255,0.35)').margin({ bottom: 48 })
         }
-        .width('100%')
-        .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [['#020617', 0.0], ['#0F172A', 0.55], ['#1E1B4B', 1.0]]
-        })
+        .width('100%').height('100%').backgroundColor(AppTheme.accentDark)
         .justifyContent(FlexAlign.Center)
-        .onAppear(() => {
-          this.startSplash();
-        })
+        .onAppear(() => this.startSplash())
       }
     }
-    .width('100%')
-    .height('100%')
-    }
+    .width('100%').height('100%').backgroundColor(AppTheme.canvas)
   }
 }

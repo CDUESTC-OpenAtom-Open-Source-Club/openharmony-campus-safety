@@ -20,6 +20,17 @@ export default class EntryAbility extends UIAbility {
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 
+    // 统一接管系统栏颜色，避免系统默认白色导航区在页面底部形成大块遮挡。
+    const mainWindow: window.Window = windowStage.getMainWindowSync();
+    mainWindow.setWindowSystemBarProperties({
+      statusBarColor: '#F8FAFC',
+      isStatusBarLightIcon: true,
+      navigationBarColor: '#F8FAFC',
+      isNavigationBarLightIcon: true
+    }).catch((err: Error) => {
+      hilog.warn(DOMAIN, 'testTag', 'Failed to apply system bar colors: %{public}s', err.message);
+    });
+
     const loadPage = (page: string): void => {
       windowStage.loadContent(page, (err) => {
         if (err.code) {
