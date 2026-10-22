@@ -168,6 +168,19 @@ export class EventService {
     }
     return [];
   }
+  /**
+   * 任务页面专用的只读列表。
+   * 所有已登录用户都可以查看任务，但修改操作仍然需要单独校验权限。
+   */
+  static getAllTasksForViewing(): Task[] {
+    const currentUser: User | null = AccountService.getCurrentUser();
+
+    if (currentUser === null) {
+      return [];
+    }
+
+    return EventRepository.getInstance().getAllTasks();
+  }
   static getMyTaskList(userId: string): Task[] {
     return EventRepository.getInstance().getAllTasks().filter((task: Task) => task.assignee === userId);
   }

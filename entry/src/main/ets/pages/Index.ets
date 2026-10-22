@@ -7,6 +7,9 @@ import { EmergencyContactPage } from './EmergencyContactPage';
 import { StudentSchedulePage } from './StudentSchedulePage';
 import { AccountPage } from './AccountPage';
 import { ProfilePage } from './ProfilePage';
+import { CountdownManagePage } from './CountdownManagePage';
+import { CountdownEvent } from '../model/CountdownEvent';
+import { CountdownService } from '../service/CountdownService';
 import { Course } from '../model/Course';
 import { ScheduleService } from '../service/ScheduleService';
 import {
@@ -23,7 +26,7 @@ import { EmergencyContactService } from '../service/EmergencyContactService';
 import { AccountService } from '../service/AccountService';
 import { AppPermission, PermissionService } from '../service/PermissionService';
 import { User, UserRole } from '../model/User';
-import { promptAction } from '@kit.ArkUI';
+import { promptAction, curves } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 import { AppTheme } from '../common/AppTheme';
 
@@ -33,6 +36,8 @@ struct Index {
   private pageStack: NavPathStack = new NavPathStack();
 
   @State private currentTab: string = 'Index';
+  @State private pressedTab: string = '';
+  @State private reportPressed: boolean = false;
   @State private loggedIn: boolean = AccountService.isLoggedIn();
   @StorageLink('emergencyPhone') private emergencyPhone: string = '';
 
@@ -49,6 +54,9 @@ struct Index {
   @State private tasks: Task[] = EventService.getAllTasks();
   @State private scheduleCourses: Course[] = [];
   @State private showSchedulePage: boolean = false;
+  @State private scheduleCardPressed: boolean = false;
+  @State private countdownEvents: CountdownEvent[] = [];
+  @State private countdownCardPressed: boolean = false;
 
   private timerEnter: number = -1;
   private timerExit: number = -1;
@@ -60,6 +68,7 @@ struct Index {
   aboutToAppear(): void {
     this.refreshEmergencyPhone();
     this.refreshSchedule();
+    this.refreshCountdowns();
   }
 
   aboutToDisappear(): void {
@@ -74,11 +83,12 @@ struct Index {
   onPageShow(): void {
     this.refreshEmergencyPhone();
     this.refreshSchedule();
+    this.refreshCountdowns();
     this.loggedIn = AccountService.isLoggedIn();
   }
 
   private navigateTo(name: string): void {
-    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage') {
+    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage' && name !== 'AiAssistantPage') {
       this.showLoginRequiredDialog();
       return;
     }
@@ -95,7 +105,9 @@ struct Index {
       promptAction.showToast({ message: '当前账号暂无数据统计权限' });
       return;
     }
-    this.currentTab = name;
+    if (name !== 'ReportPage' && name !== 'CountdownManagePage') {
+      this.currentTab = name;
+    }
     if (name === 'Index') {
       this.events = EventService.getAllEvents().slice();
       this.tasks = EventService.getAllTasks().slice();
@@ -104,6 +116,16 @@ struct Index {
     }
     this.pageStack.clear();
     this.pageStack.pushPath({ name: name });
+  }
+
+  // 中间的上报按钮是快捷动作：打开上报流程，但不修改底部导航选中态。
+  private openReportFlow(): void {
+    if (!this.loggedIn) {
+      this.showLoginRequiredDialog();
+      return;
+    }
+    this.pageStack.clear();
+    this.pageStack.pushPath({ name: 'ReportPage' });
   }
 
   private can(permission: AppPermission): boolean {
@@ -145,6 +167,14 @@ struct Index {
       this.scheduleCourses = items;
     }).catch((err: Error) => {
       console.error('ScheduleService load failed: ' + err.message);
+    });
+  }
+
+  private refreshCountdowns(): void {
+    CountdownService.getEvents(getContext(this) as common.Context).then((items: CountdownEvent[]) => {
+      this.countdownEvents = items.slice();
+    }).catch((error: Error) => {
+      console.error('CountdownService load failed: ' + error.message);
     });
   }
 
@@ -217,13 +247,13 @@ struct Index {
 
   private getUrgentCount(): number {
     return this.events.filter((event: SecurityEvent) =>
-      event.priority === EventPriority.URGENT || event.priority === EventPriority.HIGH
+    event.priority === EventPriority.URGENT || event.priority === EventPriority.HIGH
     ).length;
   }
 
   private getPendingTaskCount(): number {
     return this.tasks.filter((task: Task) =>
-      task.status === TaskStatus.PENDING || task.status === TaskStatus.PROCESSING
+    task.status === TaskStatus.PENDING || task.status === TaskStatus.PROCESSING
     ).length;
   }
 
@@ -233,7 +263,7 @@ struct Index {
       if (event.status === EventStatus.PENDING || event.status === EventStatus.CONFIRMED) {
         penalty += event.priority === EventPriority.URGENT ? 18 :
           event.priority === EventPriority.HIGH ? 12 :
-          event.priority === EventPriority.MEDIUM ? 8 : 4;
+            event.priority === EventPriority.MEDIUM ? 8 : 4;
       } else if (event.status === EventStatus.PROCESSING) {
         penalty += 4;
       }
@@ -257,13 +287,13 @@ struct Index {
   pageMap(name: string) {
     if (name === 'EventPage') {
       NavDestination() { EventPage({ pageStack: this.pageStack }) }
-        .title('安全事件').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('安全事件').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'EventDetailPage') {
       NavDestination() { EventDetailPage({ pageStack: this.pageStack }) }
-        .title('事件详情').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('事件详情').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'TaskPage') {
       NavDestination() { TaskPage({ pageStack: this.pageStack }) }
-        .title('处置任务').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('处置任务').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'ReportPage') {
       NavDestination() {
         ReportPage({
@@ -271,18 +301,18 @@ struct Index {
           onReported: (): void => { this.events = EventService.getAllEvents().slice(); }
         })
       }
-        .title('隐患上报').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('隐患上报').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'StatisticsPage') {
       NavDestination() { StatisticsPage({ pageStack: this.pageStack }) }
-        .title('数据统计').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('数据统计').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'EmergencyContactPage') {
       NavDestination() { EmergencyContactPage({ pageStack: this.pageStack }) }
-        .title('应急联系方式').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('应急联系方式').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'AccountPage') {
       NavDestination() {
         AccountPage({ pageStack: this.pageStack, onLogout: (): void => this.completeLogout() })
       }
-        .title('账号与安全').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('账号与安全').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'ProfilePage') {
       NavDestination() {
         ProfilePage({
@@ -295,8 +325,188 @@ struct Index {
           onManageAccount: (): void => this.navigateTo('AccountPage')
         })
       }
-        .title('我').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('我').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+    } else if (name === 'CountdownManagePage') {
+      NavDestination() {
+        CountdownManagePage({
+          pageStack: this.pageStack,
+          onChanged: (): void => this.refreshCountdowns()
+        })
+      }
+      .title('管理倒计时').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+    } else if (name === 'AiAssistantPage') {
+      NavDestination() {
+        Column({ space: 18 }) {
+          Text('AI 助手')
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppTheme.ink)
+
+          Text('AI 助手页面入口')
+            .fontSize(14)
+            .fontColor(AppTheme.muted)
+
+          Text('功能预留')
+            .fontSize(13)
+            .fontColor(AppTheme.accent)
+            .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+            .borderRadius(AppTheme.radiusMedium)
+            .backgroundColor(AppTheme.accentSoft)
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(AppTheme.canvas)
+        .padding(24)
+      }
+      .title('AI 助手').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     }
+  }
+
+  private getHomeCountdowns(): CountdownEvent[] {
+    return CountdownService.getHomeList(this.countdownEvents);
+  }
+
+  private isNearestCountdown(id: string): boolean {
+    const items: CountdownEvent[] = this.getHomeCountdowns();
+    return items.length > 0 && items[0].id === id;
+  }
+
+  @Builder
+  private countdownTimelineRow(event: CountdownEvent) {
+    Row({ space: 10 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        Row()
+          .width(2)
+          .height(42)
+          .backgroundColor('#E8EFF6')
+        Row()
+          .width(10)
+          .height(10)
+          .border({ width: 2, color: '#85B7EB' })
+          .borderRadius(5)
+          .backgroundColor(this.isNearestCountdown(event.id) ? '#DCEBFF' : '#FFFFFF')
+          .shadow(this.isNearestCountdown(event.id) ? { radius: 7, color: 'rgba(37, 99, 235, 0.22)', offsetY: 0 } : { radius: 0, color: '#FFFFFF', offsetY: 0 })
+      }
+      .width(10)
+      .height(42)
+
+      Column({ space: 3 }) {
+        Text(event.name)
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#1F2937')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+        Text(CountdownService.formatDateLine(event))
+          .fontSize(10.5)
+          .fontColor('#9CA3AF')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      Row({ space: 3 }) {
+        Text(CountdownService.dayText(CountdownService.daysLeft(event.date)))
+          .fontSize(CountdownService.daysLeft(event.date) <= 1 ? 12 : 18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#2563EB')
+        if (CountdownService.daysLeft(event.date) > 1) {
+          Text('天')
+            .fontSize(10.5)
+            .fontColor('#9CA3AF')
+        }
+      }
+      .alignItems(VerticalAlign.Bottom)
+    }
+    .width('100%')
+    .height(46)
+  }
+
+  @Builder
+  private countdownCard() {
+    Column({ space: 12 }) {
+      Row({ space: 10 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          Row()
+            .width(15)
+            .height(15)
+            .border({ width: 1.5, color: '#378ADD' })
+            .borderRadius(8)
+          Row()
+            .width(1.5)
+            .height(5)
+            .backgroundColor('#378ADD')
+            .translate({ x: -1, y: -2 })
+          Row()
+            .width(4)
+            .height(1.5)
+            .backgroundColor('#378ADD')
+            .translate({ x: 1, y: 1 })
+        }
+        .width(28)
+        .height(28)
+        .borderRadius(9)
+        .backgroundColor('#E6F1FB')
+
+        Text('考试倒计时')
+          .fontSize(14)
+          .fontWeight(600)
+          .fontColor('#1F2937')
+
+        Blank()
+
+        Text('管理 ›')
+          .fontSize(11.5)
+          .fontColor('#378ADD')
+          .padding({ left: 8, right: 2, top: 6, bottom: 6 })
+          .onClick(() => this.navigateTo('CountdownManagePage'))
+      }
+      .width('100%')
+
+      if (this.getHomeCountdowns().length === 0) {
+        Column({ space: 9 }) {
+          Text('还没有添加倒计时')
+            .fontSize(12)
+            .fontColor('#8A97AF')
+          Text('添加第一个倒计时')
+            .fontSize(11)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Color.White)
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+            .borderRadius(18)
+            .backgroundColor('#185FA5')
+            .onClick(() => this.navigateTo('CountdownManagePage'))
+        }
+        .width('100%')
+        .padding({ top: 18, bottom: 18 })
+        .border({ width: 1.5, color: '#D7E4F1', style: BorderStyle.Dashed })
+        .borderRadius(12)
+      } else {
+        Column({ space: 0 }) {
+          ForEach(this.getHomeCountdowns(), (event: CountdownEvent) => {
+            this.countdownTimelineRow(event)
+          })
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(14)
+    .borderRadius(15)
+    .backgroundColor('#FFFFFF')
+    .shadow({ radius: this.countdownCardPressed ? 6 : 10, color: this.countdownCardPressed ? 'rgba(24, 60, 110, 0.035)' : 'rgba(24, 60, 110, 0.05)', offsetY: this.countdownCardPressed ? 1 : 2 })
+    .scale({ x: this.countdownCardPressed ? 0.985 : 1, y: this.countdownCardPressed ? 0.985 : 1 })
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.countdownCardPressed = true;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.countdownCardPressed = false;
+      }
+    })
   }
 
   @Builder
@@ -363,9 +573,9 @@ struct Index {
       Image(icon).width(27).height(27).fillColor(Color.White)
       Text(title).fontSize(13).fontWeight(FontWeight.Medium).fontColor(Color.White)
     }.layoutWeight(1).height(102).borderRadius(17).justifyContent(FlexAlign.Center)
-      .linearGradient({ angle: 160, colors: [[tone, 0], ['#1677FF', 1]] })
-      .shadow({ radius: 8, color: AppTheme.glowBlue, offsetY: 4 })
-      .onClick(() => this.navigateTo(route))
+    .linearGradient({ angle: 160, colors: [[tone, 0], ['#1677FF', 1]] })
+    .shadow({ radius: 8, color: AppTheme.glowBlue, offsetY: 4 })
+    .onClick(() => this.navigateTo(route))
   }
 
   private getHomeCourses(): Course[] {
@@ -559,19 +769,155 @@ struct Index {
   }
 
   @Builder
-  private tabItem(key: string, label: string, icon: Resource) {
-    Column({ space: 4 }) {
-      Image(icon)
-        .width(20).height(20)
-        .fillColor(this.currentTab === key ? AppTheme.accent : AppTheme.muted)
+  private tabIcon(key: string, selected: boolean) {
+    Stack() {
+      if (key === 'Index') {
+        // 首页：屋顶线 + 房屋，选中时房屋实心。
+        Row()
+          .width(12).height(1.8).borderRadius(2)
+          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .rotate({ angle: -42 })
+          .position({ x: 1.5, y: 6.5 })
+        Row()
+          .width(12).height(1.8).borderRadius(2)
+          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .rotate({ angle: 42 })
+          .position({ x: 9.5, y: 6.5 })
+        Row()
+          .width(14).height(11)
+          .borderRadius(2)
+          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 4.5, y: 10 })
+        Row()
+          .width(4).height(6)
+          .borderRadius(1)
+          .border({ width: selected ? 0 : 1, color: '#9CA3AF' })
+          .backgroundColor(selected ? '#FFFFFF' : '#FFFFFF')
+          .position({ x: 9.5, y: 15 })
+      } else if (key === 'EventPage') {
+        // 记录：文档外框和三条内容线。
+        Row()
+          .width(15).height(19)
+          .borderRadius(2.5)
+          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 4, y: 2 })
+        Row().width(8).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .position({ x: 7.5, y: 7 })
+        Row().width(8).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .position({ x: 7.5, y: 11 })
+        Row().width(6).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .position({ x: 7.5, y: 15 })
+      } else if (key === 'TaskPage') {
+        // 任务：三项清单，选中时勾选框实心。
+        Row().width(5).height(5).borderRadius(1.2)
+          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 2.5, y: 3 })
+        Row().width(5).height(5).borderRadius(1.2)
+          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 2.5, y: 9 })
+        Row().width(5).height(5).borderRadius(1.2)
+          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 2.5, y: 15 })
+        Row().width(12).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .position({ x: 9, y: 4.8 })
+        Row().width(12).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .position({ x: 9, y: 10.8 })
+        Row().width(12).height(1.6).borderRadius(1)
+          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .position({ x: 9, y: 16.8 })
+      } else {
+        // 我的：头像和肩部轮廓，选中时采用实心人形。
+        Row()
+          .width(7.5).height(7.5).borderRadius(4)
+          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 7.75, y: 1.5 })
+        Row()
+          .width(17).height(8)
+          .borderRadius(8)
+          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .position({ x: 3, y: 13 })
+      }
+    }
+    .width(23).height(23)
+    .scale({ x: this.pressedTab === key ? 0.94 : 1, y: this.pressedTab === key ? 0.94 : 1 })
+    .animation({ duration: 220, curve: curves.cubicBezierCurve(0.34, 1.4, 0.64, 1) })
+  }
+
+  @Builder
+  private tabItem(key: string, label: string) {
+    Column({ space: 3 }) {
+      this.tabIcon(key, this.currentTab === key)
       Text(label)
-        .fontSize(10)
-        .fontWeight(this.currentTab === key ? FontWeight.Bold : FontWeight.Normal)
-        .fontColor(this.currentTab === key ? AppTheme.accent : AppTheme.muted)
+        .fontSize(10.5)
+        .fontWeight(this.currentTab === key ? FontWeight.Medium : FontWeight.Normal)
+        .fontColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
     }
     .layoutWeight(1)
+    .height(58)
     .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .animation({ duration: 200, curve: Curve.EaseOut })
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.pressedTab = key;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressedTab = '';
+      }
+    })
     .onClick(() => this.navigateTo(key))
+  }
+
+  @Builder
+  private reportActionItem() {
+    Column() {
+      Stack() {
+        Row()
+          .width(52).height(52).borderRadius(26)
+          .linearGradient({ angle: 140, colors: [['#4C8DF6', 0], ['#2563EB', 1]] })
+          .border({ width: 4, color: '#FFFFFF' })
+        Row()
+          .width(20).height(3).borderRadius(2)
+          .backgroundColor('#FFFFFF')
+        Row()
+          .width(3).height(20).borderRadius(2)
+          .backgroundColor('#FFFFFF')
+      }
+      .width(52).height(52)
+      .shadow({ radius: 18, color: 'rgba(37, 99, 235, 0.34)', offsetY: 8 })
+      .translate({ y: -30 })
+      .scale({ x: this.reportPressed ? 0.94 : 1, y: this.reportPressed ? 0.94 : 1 })
+      .animation({ duration: 220, curve: curves.cubicBezierCurve(0.34, 1.4, 0.64, 1) })
+      .onTouch((event: TouchEvent) => {
+        if (event.type === TouchType.Down) {
+          this.reportPressed = true;
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          this.reportPressed = false;
+        }
+      })
+      .onClick(() => this.openReportFlow())
+
+      Text('上报')
+        .fontSize(10.5)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#185FA5')
+        .translate({ y: -14 })
+    }
+    .layoutWeight(1)
+    .height(58)
+    .alignItems(HorizontalAlign.Center)
+    .justifyContent(FlexAlign.Start)
   }
 
   private startSplash(): void {
@@ -641,7 +987,7 @@ struct Index {
                         Text('共同守护 · 平安校园').fontSize(11).fontColor(AppTheme.muted)
                       }.alignItems(HorizontalAlign.Start).layoutWeight(1)
                     }.width('100%').padding(16).borderRadius(16)
-                      .linearGradient({ angle: 130, colors: [['#FFFFFF', 0], ['#DFEDFF', 1]] })
+                    .linearGradient({ angle: 130, colors: [['#FFFFFF', 0], ['#DFEDFF', 1]] })
                     Row() {
                       this.homeMetric('待处理事件', this.events.filter((e: SecurityEvent) => e.status === EventStatus.PENDING).length)
                       Divider().vertical(true).height(32).color(AppTheme.line)
@@ -649,6 +995,45 @@ struct Index {
                       Divider().vertical(true).height(32).color(AppTheme.line)
                       this.homeMetric('今日上报', this.events.filter((e: SecurityEvent) => e.reportTime.startsWith(new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '-' + ('0' + new Date().getDate()).slice(-2))).length)
                     }.width('100%').padding({ top: 14, bottom: 14 }).backgroundColor(AppTheme.surface).borderRadius(12)
+                    Row({ space: 12 }) {
+                      Column({ space: 6 }) {
+                        Text('AI')
+                          .fontSize(13)
+                          .fontWeight(FontWeight.Bold)
+                          .fontColor(Color.White)
+                      }
+                      .width(44)
+                      .height(44)
+                      .borderRadius(14)
+                      .backgroundColor(AppTheme.accent)
+                      .justifyContent(FlexAlign.Center)
+
+                      Column({ space: 4 }) {
+                        Text('智安 AI 助手')
+                          .fontSize(15)
+                          .fontWeight(FontWeight.Bold)
+                          .fontColor(AppTheme.ink)
+                        Text('日常 · 学习 · 校园安全')
+                          .fontSize(11)
+                          .fontColor(AppTheme.muted)
+                        Text('功能预留，点击进入')
+                          .fontSize(10)
+                          .fontColor(AppTheme.accent)
+                      }
+                      .alignItems(HorizontalAlign.Start)
+                      .layoutWeight(1)
+
+                      Text('›')
+                        .fontSize(26)
+                        .fontColor(AppTheme.accent)
+                    }
+                    .width('100%')
+                    .padding({ left: 14, right: 14, top: 13, bottom: 13 })
+                    .borderRadius(16)
+                    .backgroundColor(AppTheme.surface)
+                    .border({ width: 1, color: AppTheme.line })
+                    .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
+                    .onClick(() => this.navigateTo('AiAssistantPage'))
                     Row({ space: 10 }) {
                       this.quickAction('隐患上报', '', $r('app.media.ic_report'), '#26BBF6', 'ReportPage')
                       this.quickAction('一键求助', '', $r('app.media.ic_phone'), '#747DFF', 'EmergencyContactPage')
@@ -656,14 +1041,94 @@ struct Index {
                     }.width('100%')
                   }.width('100%').padding({ left: 16, right: 16 })
                   this.recentEvents()
-                  Row({ space: 12 }) {
-                    Text('数据统计 ›').fontSize(12).fontColor(AppTheme.accent).onClick(() => this.navigateTo('StatisticsPage'))
-                    Blank()
-                    Text('我的课表 ›').fontSize(12).fontColor(AppTheme.muted).onClick(() => this.navigateTo('SchedulePage'))
-                  }.width('100%').padding(20)
+                  Row() {
+                    Row({ space: 13 }) {
+                      Stack({ alignContent: Alignment.Center }) {
+                        Row()
+                          .width(19)
+                          .height(16)
+                          .border({ width: 1.5, color: '#378ADD' })
+                          .borderRadius(2.8)
+
+                        Row()
+                          .width(19)
+                          .height(1.5)
+                          .backgroundColor('#378ADD')
+                          .translate({ y: -2 })
+
+                        Row({ space: 7 }) {
+                          Row()
+                            .width(1.5)
+                            .height(4)
+                            .borderRadius(1)
+                            .backgroundColor('#378ADD')
+                          Row()
+                            .width(1.5)
+                            .height(4)
+                            .borderRadius(1)
+                            .backgroundColor('#378ADD')
+                        }
+                        .width(10)
+                        .justifyContent(FlexAlign.SpaceBetween)
+                        .translate({ y: -8 })
+
+                        Row()
+                          .width(2.5)
+                          .height(2.5)
+                          .borderRadius(2)
+                          .backgroundColor('#378ADD')
+                          .translate({ y: 2 })
+                      }
+                      .width(40)
+                      .height(40)
+                      .borderRadius(12)
+                      .backgroundColor('#E6F1FB')
+
+                      Column({ space: 3 }) {
+                        Text('我的课表')
+                          .fontSize(14)
+                          .fontWeight(600)
+                          .fontColor('#1F2937')
+                        Text('查看本周课程安排')
+                          .fontSize(11)
+                          .fontColor('#9CA3AF')
+                      }
+                      .layoutWeight(1)
+                      .alignItems(HorizontalAlign.Start)
+
+                      Text('›')
+                        .fontSize(15)
+                        .fontColor('#378ADD')
+                    }
+                    .width('100%')
+                    .padding({ left: 15, right: 15, top: 13, bottom: 13 })
+                    .borderRadius(15)
+                    .backgroundColor('#FFFFFF')
+                    .shadow({
+                      radius: this.scheduleCardPressed ? 6 : 10,
+                      color: this.scheduleCardPressed ? 'rgba(24, 60, 110, 0.04)' : 'rgba(24, 60, 110, 0.06)',
+                      offsetY: this.scheduleCardPressed ? 1 : 2
+                    })
+                    .scale({ x: this.scheduleCardPressed ? 0.985 : 1, y: this.scheduleCardPressed ? 0.985 : 1 })
+                    .onTouch((event: TouchEvent) => {
+                      if (event.type === TouchType.Down) {
+                        this.scheduleCardPressed = true;
+                      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                        this.scheduleCardPressed = false;
+                      }
+                    })
+                    .onClick(() => this.navigateTo('SchedulePage'))
+                  }
+                  .width('100%')
+                  .padding({ left: 16, right: 16, bottom: 12 })
+                  Column() {
+                    this.countdownCard()
+                  }
+                  .width('100%')
+                  .padding({ left: 16, right: 16, bottom: 16 })
                 }
                 .width('100%')
-                .padding({ bottom: 16 })
+                .padding({ bottom: 96 })
               }
               .width('100%').layoutWeight(1).backgroundColor(AppTheme.canvas).scrollBar(BarState.Off)
             }
@@ -671,17 +1136,19 @@ struct Index {
           }
           .width('100%').layoutWeight(1).hideTitleBar(true).navDestination(this.pageMap)
 
-          // 底部导航栏
+          // 底部导航栏：四个页面入口 + 中间凸起的上报快捷动作。
           Row() {
-            this.tabItem('Index', '首页', $r('app.media.ic_home'))
-            this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件', $r('app.media.ic_event'))
-            this.tabItem('ReportPage', '上报', $r('app.media.ic_report'))
-            this.tabItem('TaskPage', '任务', $r('app.media.ic_task'))
-            this.tabItem('ProfilePage', '我', $r('app.media.ic_account'))
+            this.tabItem('Index', '首页')
+            this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件')
+            this.reportActionItem()
+            this.tabItem('TaskPage', '任务')
+            this.tabItem('ProfilePage', '我')
           }
-          .width('100%').height(60).backgroundColor(AppTheme.surface)
-          .border({ width: { top: 1 }, color: AppTheme.line })
-          .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: -2 })
+          .width('100%').height(58).backgroundColor('#FFFFFF')
+          .border({ width: { top: 1 }, color: 'rgba(17, 24, 39, 0.08)' })
+          .shadow({ radius: 12, color: 'rgba(24, 60, 110, 0.05)', offsetY: -2 })
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+          .clip(false)
         }
       }
       .width('100%').height('100%').backgroundColor(AppTheme.canvas)

@@ -29,6 +29,7 @@ export class PermissionService {
         permission === AppPermission.REPORT_HAZARD;
     }
     return permission === AppPermission.REPORT_HAZARD ||
-      permission === AppPermission.VIEW_OWN_REPORTS;
+      permission === AppPermission.VIEW_OWN_REPORTS ||
+      permission === AppPermission.VIEW_ASSIGNED_TASKS;
   }
 }

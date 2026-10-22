@@ -24,7 +24,7 @@ export struct TaskPage {
   pageStack: NavPathStack = new NavPathStack();
 
   @State private pageReady: boolean = false;
-  @State private tasks: Task[] = EventService.getAllTasks();
+  @State private tasks: Task[] = EventService.getAllTasksForViewing();
   @State private filterTab: string = 'ALL';
   @State private expandedTaskId: string = '';
   @State private processingTaskId: string = '';
@@ -183,11 +183,27 @@ export struct TaskPage {
   }
 
   private refreshTasks(): void {
-    this.tasks = EventService.getAllTasks().slice();
+    this.tasks = EventService.getAllTasksForViewing().slice();
   }
 
   private can(permission: AppPermission): boolean {
     return PermissionService.can(AccountService.getCurrentUser(), permission);
+  }
+
+  // 管理员可以管理全部任务；安保人员只能处理分配给自己的任务。
+  private canWorkOnTask(task: Task): boolean {
+    const user: User | null = AccountService.getCurrentUser();
+
+    if (user === null) {
+      return false;
+    }
+
+    if (user.role === UserRole.ADMIN) {
+      return true;
+    }
+
+    return user.role === UserRole.SECURITY &&
+      task.assignee === user.id;
   }
 
   private selectTaskEvidence(task: Task, isBefore: boolean): void {
@@ -374,7 +390,11 @@ export struct TaskPage {
 
       Row() {
         Blank()
-        Button(this.expandedTaskId === task.id ? '收起' : task.status === TaskStatus.COMPLETED ? '查看结果' : '查看 / 处理')
+        Button(this.expandedTaskId === task.id ? '收起' :
+          task.status === TaskStatus.COMPLETED ? '查看结果' :
+            (this.canWorkOnTask(task) &&
+              (task.status !== TaskStatus.REVIEW || this.can(AppPermission.REVIEW_TASK)) ?
+              '查看 / 处理' : '查看详情'))
           .height(32).fontSize(12).fontColor(Color.White).backgroundColor(AppTheme.accent).borderRadius(16)
           .onClick(() => { this.expandedTaskId = this.expandedTaskId === task.id ? '' : task.id; })
       }.width('100%')
@@ -396,7 +416,9 @@ export struct TaskPage {
         this.evidenceBlock(task, '处置后证据', task.afterAttachmentPaths ?? [], false, false)
       }
 
-      if (task.status === TaskStatus.PENDING && this.can(AppPermission.START_TASK)) {
+        if (task.status === TaskStatus.PENDING &&
+        this.can(AppPermission.START_TASK) &&
+        this.canWorkOnTask(task)) {
         Button('去处理')
           .width('100%')
           .height(42)
@@ -415,7 +437,32 @@ export struct TaskPage {
           })
       }
 
-      if (task.status === TaskStatus.PROCESSING && this.can(AppPermission.SUBMIT_TASK)) {
+        if (task.status === TaskStatus.PROCESSING &&
+          !(this.can(AppPermission.SUBMIT_TASK) && this.canWorkOnTask(task))) {
+
+          if ((task.beforeAttachmentPaths ?? []).length > 0) {
+            this.evidenceBlock(
+              task,
+              '处置前证据',
+              task.beforeAttachmentPaths ?? [],
+              true,
+              false
+            )
+          }
+
+          if ((task.afterAttachmentPaths ?? []).length > 0) {
+            this.evidenceBlock(
+              task,
+              '处置后证据',
+              task.afterAttachmentPaths ?? [],
+              false,
+              false
+            )
+          }
+        }
+        if (task.status === TaskStatus.PROCESSING &&
+        this.can(AppPermission.SUBMIT_TASK) &&
+        this.canWorkOnTask(task)) {
         Column({ space: 8 }) {
           this.evidenceBlock(task, '处置前证据', task.beforeAttachmentPaths ?? [], true, true)
           this.evidenceBlock(task, '处置后证据', task.afterAttachmentPaths ?? [], false, true)
