@@ -1,3 +1,4 @@
+import { ListSnapshotDataSource } from '../common/ListSnapshotDataSource';
 import {
   Task,
   TaskStatus
@@ -727,15 +728,15 @@ export struct TaskPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        Scroll() {
-          Column({ space: 12 }) {
-            ForEach(this.getFilteredTasks(), (task: Task) => {
+        List({ space: 12 }) {
+            LazyForEach(new ListSnapshotDataSource<Task>(this.getFilteredTasks()), (task: Task) => {
+              ListItem() {
               this.taskCard(task)
+              }
             }, (task: Task) => task.id)
-          }
-          .width('100%')
-          .padding({ left: 14, right: 14, top: 12, bottom: 24 })
         }
+        .padding({ left: 14, right: 14, top: 12, bottom: 24 })
+        .cachedCount(2)
         .width('100%')
         .layoutWeight(1)
         .scrollBar(BarState.Off)

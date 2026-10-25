@@ -1,0 +1,45 @@
+plugins { id 'com.android.application' }
+
+def signingValues = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signingValues.load(it) }
+
+android {
+    namespace 'com.example.hongmengzhian'
+    compileSdk 33
+    defaultConfig {
+        applicationId 'com.example.hongmengzhian'
+        minSdk 26
+        targetSdk 33
+        versionCode 6
+        versionName '0.2.1'
+    }
+    signingConfigs {
+        if (signingFile.exists()) {
+            release {
+                storeFile rootProject.file(signingValues['storeFile'])
+                storePassword signingValues['storePassword']
+                keyAlias signingValues['keyAlias']
+                keyPassword signingValues['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signingFile.exists()) signingConfig signingConfigs.release
+        }
+    }
+    sourceSets {
+        main { jniLibs.srcDirs = ['libs'] }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    packagingOptions { jniLibs { useLegacyPackaging true } }
+}
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.window:window-java:1.0.0'
+}

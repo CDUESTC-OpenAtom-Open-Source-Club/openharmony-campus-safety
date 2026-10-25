@@ -79,6 +79,7 @@ const { AiProtocolService: protocol } = load(base + '/service/AiProtocolService.
 const { AiConfigService: storage } = load(base + '/service/AiConfigService.ets');
 const { AiClient } = load(base + '/service/AiClient.ets');
 const { AiAssistantPage } = load(base + '/pages/AiAssistantPage.ets');
+const { PlatformBridge } = load(base + '/service/PlatformBridge.ets');
 const config = (patch = {}) => ({ ...AiProviders.defaults(0), model: 'test-model', apiKey: 'fixture-key-only', ...patch });
 function reply(status = 200, raw = '{"choices":[{"message":{"content":"你好"}}]}') {
   behavior = async (session) => {
@@ -345,4 +346,149 @@ test('automatic catalog failure preserves manual ID and does not open a chat app
   reply(404, '{}'); await page.readModels(true);
   assert.equal(page.model, 'manual'); assert.equal(page.readingModels, false);
   assert.ok(page.modelStatus.includes('手动输入'));
+});
+
+// Exercise the Android branch of the actual shared services. The bridge is a
+// native boundary double; these cases do not prove Android Keystore hardware.
+test('Android model discovery uses DeepSeek GET endpoint and parses vendor model IDs', async () => {
+  const previous = PlatformBridge.bridge;
+  PlatformBridge.checked = true;
+  const calls = [];
+  PlatformBridge.bridge = { async callMethod(method, payload) {
+    calls.push([method, JSON.parse(payload)]);
+    return JSON.stringify({ ok: true, value: JSON.stringify({ status: 200,
+      body: '{"data":[{"id":"deepseek-chat"},{"id":"deepseek-reasoner"}]}' }) });
+  } };
+  try {
+    const result = await new AiClient().listModels(config({ model: '' }));
+    assert.deepEqual(result.ids, ['deepseek-chat', 'deepseek-reasoner']);
+    assert.equal(calls[0][0], 'request');
+    assert.equal(calls[0][1].endpoint, 'https://api.deepseek.com/models');
+    assert.equal(calls[0][1].method, 'GET');
+    assert.equal(calls[0][1].body, '');
+    assert.equal(calls[0][1].headers.Authorization, 'Bearer fixture-key-only');
+  } finally { PlatformBridge.bridge = previous; }
+});
+
+test('Android config operations preserve account isolation and never fall back after native failure', async () => {
+  const previous = PlatformBridge.bridge;
+  const saved = new Map();
+  let fail = false;
+  PlatformBridge.bridge = { async callMethod(method, payload) {
+    if (fail) throw new Error('fixture-key-only');
+    if (method === 'saveConfig') {
+      const record = JSON.parse(payload); saved.set(record.alias, record.value);
+      return JSON.stringify({ ok: true, value: '' });
+    }
+    if (method === 'removeConfig') saved.delete(payload);
+    return JSON.stringify({ ok: true, value: method === 'loadConfig' ? (saved.get(payload) || '') : '' });
+  } };
+  try {
+    user = { id: 'user-a' }; await storage.save(config());
+    user = { id: 'user-b' }; assert.equal(await storage.load('deepseek'), null);
+    user = { id: 'user-a' }; assert.equal((await storage.load('deepseek')).model, 'test-model');
+    await storage.remove('deepseek'); assert.equal(await storage.load('deepseek'), null);
+    const priorAssetCount = records.size;
+    fail = true;
+    await assert.rejects(storage.save(config()), e => !e.message.includes('fixture-key-only'));
+    assert.equal(records.size, priorAssetCount);
+  } finally { PlatformBridge.bridge = previous; user = { id: 'user-a' }; }
+});
+
+test('Android native errors, malformed replies and timeouts are bounded and sanitized', async () => {
+  const previous = PlatformBridge.bridge;
+  try {
+    for (const result of ['fixture-key-only', '{"ok":false,"value":"fixture-key-only"}']) {
+      PlatformBridge.bridge = { async callMethod() { return result; } };
+      await assert.rejects(PlatformBridge.call('loadConfig', 'alias'), e => !e.message.includes('fixture-key-only'));
+    }
+    PlatformBridge.bridge = { async callMethod() { return new Promise(() => {}); } };
+    await assert.rejects(PlatformBridge.call('loadConfig', 'alias', 5), /原生操作未完成/);
+  } finally { PlatformBridge.bridge = previous; }
+});
+
+test('Android canceled discovery cannot restore a late model list', async () => {
+  const previous = PlatformBridge.bridge;
+  let finish;
+  let requested;
+  const started = new Promise(resolve => { requested = resolve; });
+  let canceled = false;
+  PlatformBridge.bridge = { async callMethod(method) {
+    if (method === 'cancelRequest') { canceled = true; return '{"ok":true,"value":""}'; }
+    requested();
+    return new Promise(resolve => { finish = resolve; });
+  } };
+  try {
+    const client = new AiClient(); const pending = client.listModels(config());
+    await started; client.cancel();
+    finish(JSON.stringify({ ok: true, value: JSON.stringify({ status: 200, body: '{"data":[{"id":"late"}]}' }) }));
+    await assert.rejects(pending, /取消/);
+    assert.equal(canceled, true); assert.equal(client.requesting, false);
+  } finally { PlatformBridge.bridge = previous; }
+});
+
+test('saving while a catalog is running cancels discovery and persists the explicit config', async () => {
+  const page = new AiAssistantPage(); page.owner = 'user-a'; page.apiKey = 'fixture'; page.model = 'chosen';
+  page.readingModels = true;
+  let canceled = false;
+  page.client.cancel = () => { canceled = true; };
+  await page.save();
+  assert.equal(canceled, true); assert.equal(page.readingModels, false);
+  assert.equal(page.saved, true); assert.equal(page.loading, false);
+  assert.equal((await storage.load('deepseek')).model, 'chosen');
+  await storage.remove('deepseek');
+});
+
+test('model invalidation during config load must release the form after storage completes', async () => {
+  const original = storage.load;
+  let finish;
+  storage.load = () => new Promise(resolve => { finish = resolve; });
+  try {
+    const page = new AiAssistantPage(); page.owner = 'user-a';
+    const pending = page.loadProvider(0);
+    assert.equal(page.loading, true);
+    page.invalidateModels();
+    finish(null); await pending;
+    assert.equal(page.loading, false, 'stale directory revision must not leave config loading locked');
+  } finally { storage.load = original; }
+});
+
+test('older config reads cannot release the lock held by a newer provider read', async () => {
+  const original = storage.load;
+  const finishes = [];
+  storage.load = () => new Promise(resolve => { finishes.push(resolve); });
+  try {
+    const page = new AiAssistantPage(); page.owner = 'user-a';
+    const first = page.loadProvider(0); const second = page.loadProvider(1);
+    finishes[0](null); await first; assert.equal(page.loading, true);
+    finishes[1](null); await second; assert.equal(page.loading, false);
+  } finally { storage.load = original; }
+});
+
+test('config timeout unlocks manual configuration and ignores a late stored reply', async () => {
+  const original = storage.load;
+  let finish;
+  storage.load = () => new Promise(resolve => { finish = resolve; });
+  try {
+    const page = new AiAssistantPage(); page.owner = 'user-a'; page.configTimeoutMs = 5;
+    await page.loadProvider(0);
+    assert.equal(page.loading, false); assert.ok(page.status.includes('超时'));
+    page.model = 'manual-model'; page.apiKey = 'manual-key';
+    finish(config({ model: 'late-model', apiKey: 'late-secret' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(page.model, 'manual-model'); assert.equal(page.apiKey, 'manual-key'); assert.equal(page.saved, false);
+  } finally { storage.load = original; }
+});
+
+test('config save and removal always unlock after catalog invalidation', async () => {
+  for (const name of ['save', 'remove']) {
+    const original = storage[name]; let finish;
+    storage[name] = () => new Promise(resolve => { finish = resolve; });
+    try {
+      const page = new AiAssistantPage(); page.owner = 'user-a'; page.apiKey = 'fixture'; page.model = 'model';
+      const pending = page[name](); assert.equal(page.loading, true);
+      page.invalidateModels(); finish(); await pending;
+      assert.equal(page.loading, false, name);
+    } finally { storage[name] = original; }
+  }
 });
