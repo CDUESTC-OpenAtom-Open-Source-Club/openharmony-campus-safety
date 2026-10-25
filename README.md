@@ -25,6 +25,8 @@
 
 ## 核心特性
 
+新增可选 AI 助手：在 App 内配置云厂商密钥、Ollama 或自定义兼容接口。采用原生 ArkUI、RCP 和 Asset Store；支持范围、使用方法与隐私边界见 [AI_API.md](AI_API.md)，已执行测试和待验收项见 [AI_VALIDATION.md](AI_VALIDATION.md)。当前已完成本地 HarmonyOS 构建和离线逻辑测试，未宣称各厂商/设备均已联调。
+
 | 特性 | 说明 |
 | :--- | :--- |
 | 原生鸿蒙实现 | ArkTS + ArkUI，Stage 模型，Navigation 导航 |

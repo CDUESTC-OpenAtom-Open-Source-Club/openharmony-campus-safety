@@ -7,6 +7,7 @@ import { EmergencyContactPage } from './EmergencyContactPage';
 import { StudentSchedulePage } from './StudentSchedulePage';
 import { AccountPage } from './AccountPage';
 import { ProfilePage } from './ProfilePage';
+import { AiAssistantPage } from './AiAssistantPage';
 import { CountdownManagePage } from './CountdownManagePage';
 import { CountdownEvent } from '../model/CountdownEvent';
 import { CountdownService } from '../service/CountdownService';
@@ -88,7 +89,7 @@ struct Index {
   }
 
   private navigateTo(name: string): void {
-    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage' && name !== 'AiAssistantPage') {
+    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage') {
       this.showLoginRequiredDialog();
       return;
     }
@@ -322,7 +323,8 @@ struct Index {
             this.tasks = EventService.getAllTasks().slice();
           },
           onLogout: (): void => this.completeLogout(),
-          onManageAccount: (): void => this.navigateTo('AccountPage')
+          onManageAccount: (): void => this.navigateTo('AccountPage'),
+          onOpenAi: (): void => this.navigateTo('AiAssistantPage')
         })
       }
       .title('我').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
@@ -336,28 +338,7 @@ struct Index {
       .title('管理倒计时').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'AiAssistantPage') {
       NavDestination() {
-        Column({ space: 18 }) {
-          Text('AI 助手')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppTheme.ink)
-
-          Text('AI 助手页面入口')
-            .fontSize(14)
-            .fontColor(AppTheme.muted)
-
-          Text('功能预留')
-            .fontSize(13)
-            .fontColor(AppTheme.accent)
-            .padding({ left: 18, right: 18, top: 12, bottom: 12 })
-            .borderRadius(AppTheme.radiusMedium)
-            .backgroundColor(AppTheme.accentSoft)
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(AppTheme.canvas)
-        .padding(24)
+        AiAssistantPage({ pageStack: this.pageStack })
       }
       .title('AI 助手').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     }
@@ -882,7 +863,7 @@ struct Index {
   @Builder
   private reportActionItem() {
     Column() {
-      Stack() {
+      Stack({ alignContent: Alignment.Center }) {
         Row()
           .width(52).height(52).borderRadius(26)
           .linearGradient({ angle: 140, colors: [['#4C8DF6', 0], ['#2563EB', 1]] })
@@ -894,8 +875,8 @@ struct Index {
           .width(3).height(20).borderRadius(2)
           .backgroundColor('#FFFFFF')
       }
-      .width(52).height(52)
-      .shadow({ radius: 18, color: 'rgba(37, 99, 235, 0.34)', offsetY: 8 })
+      // 裁剪整个图标容器为圆形；不对矩形 Stack 投影，避免圆外出现浅色方框。
+      .width(52).height(52).borderRadius(26).clip(true)
       .translate({ y: -30 })
       .scale({ x: this.reportPressed ? 0.94 : 1, y: this.reportPressed ? 0.94 : 1 })
       .animation({ duration: 220, curve: curves.cubicBezierCurve(0.34, 1.4, 0.64, 1) })

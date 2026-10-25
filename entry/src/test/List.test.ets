@@ -1,4 +1,5 @@
 import localUnitTest from './LocalUnit.test';
+import aiProtocolTest from './AiProtocol.test';
 import eventSimulatorTest from './EventSimulator.test';
 import eventRepositoryTest from './EventRepository.test';
 import eventWorkflowTest from './EventWorkflow.test';
@@ -10,6 +11,7 @@ import accountRegistrationTest from './AccountRegistration.test';
 
 export default function testsuite() {
   localUnitTest();
+  aiProtocolTest();
   eventSimulatorTest();
   eventRepositoryTest();
   eventWorkflowTest();
