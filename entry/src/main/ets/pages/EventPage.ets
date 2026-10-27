@@ -1,3 +1,4 @@
+import { ListSnapshotDataSource } from '../common/ListSnapshotDataSource';
 import {
   SecurityEvent,
   EventPriority,
@@ -197,9 +198,9 @@ export struct EventPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        Scroll() {
-          Column({ space: 10 }) {
-            ForEach(this.getFilteredEvents(), (event: SecurityEvent) => {
+        List({ space: 10 }) {
+            LazyForEach(new ListSnapshotDataSource<SecurityEvent>(this.getFilteredEvents()), (event: SecurityEvent) => {
+              ListItem() {
               Column({ space: 12 }) {
                 Row({ space: 9 }) {
                   Text(event.priority).fontSize(12).fontColor(Color.White).fontWeight(FontWeight.Bold)
@@ -227,11 +228,11 @@ export struct EventPage {
                 EventService.setSelectedEventId(event.id);
                 this.pageStack.pushPath({ name: 'EventDetailPage' });
               })
+              }
             }, (event: SecurityEvent) => event.id)
-          }
-          .width('100%')
-          .padding({ left: 14, right: 14, top: 12, bottom: 24 })
         }
+        .padding({ left: 14, right: 14, top: 12, bottom: 24 })
+        .cachedCount(2)
         .width('100%')
         .layoutWeight(1)
         .scrollBar(BarState.Off)

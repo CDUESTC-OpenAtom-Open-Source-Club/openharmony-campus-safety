@@ -6,6 +6,7 @@ import { AiConfigService } from '../service/AiConfigService';
 import { AiProtocolService } from '../service/AiProtocolService';
 import { AiClient } from '../service/AiClient';
 import { AccountService } from '../service/AccountService';
+import { PlatformBridge } from '../service/PlatformBridge';
 
 @Component
 export struct AiAssistantPage {
@@ -31,6 +32,9 @@ export struct AiAssistantPage {
   @StorageLink('aiPrivacyEpoch') @Watch('onPrivacyChanged') private privacyEpoch: number = 0;
   private client: AiClient = new AiClient();
   private revision: number = 0;
+  // Directory edits invalidate responses, but must never own the config form lock.
+  private configOperation: number = 0;
+  private readonly configTimeoutMs: number = 8000;
   private active: boolean = true;
   private owner: string = '';
   private protocols: AiProtocol[] = [AiProtocol.OPENAI, AiProtocol.CLAUDE, AiProtocol.OLLAMA];
@@ -44,6 +48,11 @@ export struct AiAssistantPage {
 
   private async enablePrivacy(): Promise<void> {
     try {
+      if (await PlatformBridge.get() !== null) {
+        await PlatformBridge.call('enablePrivacy', '');
+        if (this.active) this.privacyReady = true;
+        return;
+      }
       const context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const main: window.Window = await window.getLastWindow(context);
       await main.setWindowPrivacyMode(true);
@@ -58,6 +67,7 @@ export struct AiAssistantPage {
   }
 
   private onPrivacyChanged(): void {
+    this.configOperation++;
     this.invalidateModels();
     this.apiKey = '';
     this.input = '';
@@ -77,6 +87,20 @@ export struct AiAssistantPage {
     return this.active && this.owner !== '' && this.owner === (AccountService.getCurrentUser()?.id ?? '');
   }
 
+  private async awaitConfig<T>(operation: Promise<T>): Promise<T> {
+    let timer: number = -1;
+    try {
+      return await Promise.race([
+        operation,
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('安全存储响应超时，已解除等待；可手动配置或重试读取')), this.configTimeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer !== -1) clearTimeout(timer);
+    }
+  }
+
   private async loadProvider(index: number): Promise<void> {
     this.invalidateModels();
     const version: number = ++this.revision;
@@ -92,9 +116,13 @@ export struct AiAssistantPage {
     this.saved = false;
     this.status = '';
     if (!this.isOwner()) { this.status = '请先登录，再使用账号独立的 AI 配置'; return; }
+    const operation: number = ++this.configOperation;
     this.loading = true;
+    this.status = '正在读取当前账号的安全配置…';
+    console.info('[AiConfigState] read begin operation=' + operation + ' revision=' + version);
     try {
-      const config: AiConfig | null = await AiConfigService.load(defaults.providerId);
+      const config: AiConfig | null = await this.awaitConfig(AiConfigService.load(defaults.providerId));
+      console.info('[AiConfigState] read settled operation=' + operation + ' revision=' + this.revision);
       if (version !== this.revision || !this.isOwner()) return;
       if (config !== null) {
         this.endpoint = config.endpoint;
@@ -104,33 +132,47 @@ export struct AiAssistantPage {
         this.localHttp = config.allowLocalHttp;
         this.saved = true;
         this.status = '已读取当前账号的安全配置';
+      } else {
+        this.status = '尚无已保存配置，可以直接填写';
       }
     } catch (error) {
-      if (version === this.revision && this.isOwner()) this.status = (error as Error).message;
-    } finally { if (version === this.revision) this.loading = false; }
+      if (operation === this.configOperation && this.isOwner()) this.status = (error as Error).message;
+    } finally {
+      if (operation === this.configOperation) {
+        this.loading = false;
+        if (this.status === '正在读取当前账号的安全配置…') this.status = '读取已结束，保留当前输入，可继续配置';
+      }
+      console.info('[AiConfigState] read finished operation=' + operation + ' currentOperation=' + this.configOperation);
+    }
   }
 
   private async save(): Promise<void> {
     if (!this.isOwner()) { this.status = '请先登录'; return; }
+    if (this.loading || this.busy) return;
+    this.invalidateModels();
     const version: number = this.revision;
+    const operation: number = ++this.configOperation;
     this.loading = true;
     try {
-      await AiConfigService.save(this.config());
+      await this.awaitConfig(AiConfigService.save(this.config()));
       if (version !== this.revision || !this.isOwner()) return;
       this.saved = true;
       this.status = '已保存到系统安全存储';
       this.settings = false;
     } catch (error) {
       if (version === this.revision && this.isOwner()) this.status = (error as Error).message;
-    } finally { if (version === this.revision) this.loading = false; }
+    } finally { if (operation === this.configOperation) this.loading = false; }
   }
 
   private async remove(): Promise<void> {
     if (!this.isOwner()) return;
+    if (this.loading || this.busy) return;
+    this.invalidateModels();
     const version: number = this.revision;
+    const operation: number = ++this.configOperation;
     this.loading = true;
     try {
-      await AiConfigService.remove(AiProviders.ALL[this.provider].id);
+      await this.awaitConfig(AiConfigService.remove(AiProviders.ALL[this.provider].id));
       if (version !== this.revision || !this.isOwner()) return;
       this.apiKey = '';
       this.saved = false;
@@ -139,7 +181,7 @@ export struct AiAssistantPage {
       this.status = '已删除此服务商的安全配置和密钥';
     } catch (error) {
       if (version === this.revision && this.isOwner()) this.status = (error as Error).message;
-    } finally { if (version === this.revision) this.loading = false; }
+    } finally { if (operation === this.configOperation) this.loading = false; }
   }
 
   private async send(test: boolean): Promise<void> {
@@ -223,26 +265,36 @@ export struct AiAssistantPage {
       this.label('接口协议')
       Select([{ value: 'OpenAI 兼容（含 Gemini）' }, { value: 'Anthropic Messages' }, { value: 'Ollama 原生' }])
         .selected(this.protocol).value(['OpenAI 兼容（含 Gemini）', 'Anthropic Messages', 'Ollama 原生'][this.protocol])
-        .width('100%').onSelect((index: number) => { this.invalidateModels(); this.protocol = index; this.saved = false; this.apiKey = ''; })
+        .width('100%').onSelect((index: number) => {
+          if (index === this.protocol) return;
+          this.invalidateModels(); this.protocol = index; this.saved = false; this.apiKey = '';
+        })
       this.label('完整接口地址（含路径）')
       TextInput({ text: this.endpoint, placeholder: 'https://服务地址/v1/chat/completions' })
         .maxLength(2048).height(48).onChange((value: string) => {
+          if (value === this.endpoint) return;
           this.invalidateModels(); this.endpoint = value; this.apiKey = ''; this.saved = false; this.answer = '';
         })
-        .onEditChange((editing: boolean) => { if (!editing) this.readModels(true); })
+
       Text('千问、华为云请从控制台复制当前工作空间、区域对应的完整 URL。修改地址或协议后须重新填写密钥。')
         .fontSize(13).fontColor(AppTheme.inkSoft).width('100%')
       this.label('API 密钥（Ollama / 自定义可留空）')
       TextInput({ text: this.apiKey, placeholder: '仅存于当前账号的系统安全存储' })
         .type(InputType.Password).showPasswordIcon(false).enableAutoFill(false).maxLength(4096).height(48)
-        .copyOption(CopyOptions.None).onChange((value: string) => { this.invalidateModels(); this.apiKey = value; this.saved = false; })
-        .onEditChange((editing: boolean) => { if (!editing) this.readModels(true); })
-      Text('完成密钥输入后自动读取模型目录，仅向当前接口所属服务发送认证信息，不发送问答内容。读取失败时可手动填写 ID。')
+        .copyOption(CopyOptions.None).onChange((value: string) => {
+          if (value === this.apiKey) return;
+          this.invalidateModels(); this.apiKey = value; this.saved = false;
+        })
+
+      Text('填写密钥后点击“读取可用模型”，仅向当前接口所属服务发送认证信息，不发送问答内容。读取失败时可手动填写 ID。')
         .fontSize(13).fontColor(AppTheme.inkSoft).width('100%')
       Row({ space: 12 }) {
         Text('允许私网 / 本机明文 HTTP').fontSize(14).fontColor(AppTheme.ink).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.localHttp })
-          .onChange((value: boolean) => { this.invalidateModels(); this.localHttp = value; this.saved = false; })
+          .onChange((value: boolean) => {
+            if (value === this.localHttp) return;
+            this.invalidateModels(); this.localHttp = value; this.saved = false;
+          })
       }.width('100%').constraintSize({ minHeight: 48 })
       Text('手机上的 127.0.0.1 指手机自身。访问电脑 Ollama 请填同一局域网电脑 IP，例如 http://192.168.1.20:11434/api/chat，并检查监听地址、防火墙和访问控制。')
         .fontSize(13).fontColor(AppTheme.inkSoft).width('100%')
@@ -280,7 +332,7 @@ export struct AiAssistantPage {
       TextInput({ text: this.model, placeholder: '也可手动输入模型或方舟接入点 ID' })
         .maxLength(160).height(48).onChange((value: string) => { this.model = value; this.saved = false; })
       Button('保存安全配置').width('100%').height(48).backgroundColor(AppTheme.accentDeep)
-        .enabled(!this.readingModels).onClick(() => this.save())
+        .onClick(() => this.save())
       Row({ space: 12 }) {
         Button('读取已保存配置').layoutWeight(1).height(48).enabled(!this.readingModels).onClick(() => this.loadProvider(this.provider))
         Button('删除此配置').layoutWeight(1).height(48).fontColor('#B42332').backgroundColor(AppTheme.surfaceMuted)
