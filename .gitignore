@@ -36,6 +36,13 @@
 # 本地发布包（体积大，不入库）
 /release/
 
+# 上架素材：只提交文档与图标/截图，签名安装包不入库
+/dist/*.app
+/dist/*.hap
+
+# AGC 提审截图与 store-screenshots 为同一批图，只保留后者
+/dist/agc-screenshots/
+
 # 本地签名材料（密钥与口令，绝不入库）
 /signing/
 
