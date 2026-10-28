@@ -10,7 +10,6 @@ export struct ProfilePage {
   onLogin: () => void = (): void => {};
   onLogout: () => void = (): void => {};
   onManageAccount: () => void = (): void => {};
-  onOpenAi: () => void = (): void => {};
 
   @State private authVisible: boolean = false;
   @State private startInRegister: boolean = false;
@@ -288,13 +287,6 @@ export struct ProfilePage {
   @Builder
   private menuSection() {
     Column() {
-      this.menuRow(
-        $r('app.media.ic_shield'),
-        'AI 助手与 API 配置',
-        '云端模型、Ollama 与自定义接口',
-        AppTheme.accent,
-        () => this.onOpenAi()
-      )
       this.menuRow(
         $r('app.media.ic_shield_check'),
         '账号与安全',

@@ -7,7 +7,6 @@ import { EmergencyContactPage } from './EmergencyContactPage';
 import { StudentSchedulePage } from './StudentSchedulePage';
 import { AccountPage } from './AccountPage';
 import { ProfilePage } from './ProfilePage';
-import { AiAssistantPage } from './AiAssistantPage';
 import { CountdownManagePage } from './CountdownManagePage';
 import { CountdownEvent } from '../model/CountdownEvent';
 import { CountdownService } from '../service/CountdownService';
@@ -30,6 +29,7 @@ import { User, UserRole } from '../model/User';
 import { promptAction, curves } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 import { AppTheme } from '../common/AppTheme';
+import { AiAssistantPage } from './AiAssistantPage'
 
 @Entry
 @Component
@@ -42,9 +42,15 @@ struct Index {
   @State private loggedIn: boolean = AccountService.isLoggedIn();
   @StorageLink('emergencyPhone') private emergencyPhone: string = '';
 
-  @StorageLink('keyboardVisible') private keyboardVisible: boolean = false;
-  private fullHeight: number = 0;
-  private lastWidth: number = 0;
+  // 开屏动画控制：保留现有启动流程，但视觉改为安静的品牌引导。
+  @State private splashVisible: boolean = true;
+  @State private splashOpacity: number = 0;
+  @State private splashScale: number = 0.92;
+  @State private splashOffsetY: number = 18;
+  @State private splashProgress: number = 0;
+  @State private splashStepText: string = '正在初始化安防引擎...';
+
+  @State private homeReady: boolean = false;
   @State private events: SecurityEvent[] = EventService.getAllEvents();
   @State private tasks: Task[] = EventService.getAllTasks();
   @State private scheduleCourses: Course[] = [];
@@ -53,10 +59,26 @@ struct Index {
   @State private countdownEvents: CountdownEvent[] = [];
   @State private countdownCardPressed: boolean = false;
 
+  private timerEnter: number = -1;
+  private timerExit: number = -1;
+  private timerFinish: number = -1;
+  private timerProgress1: number = -1;
+  private timerProgress2: number = -1;
+  private timerProgress3: number = -1;
+
   aboutToAppear(): void {
     this.refreshEmergencyPhone();
     this.refreshSchedule();
     this.refreshCountdowns();
+  }
+
+  aboutToDisappear(): void {
+    if (this.timerEnter !== -1) clearTimeout(this.timerEnter);
+    if (this.timerExit !== -1) clearTimeout(this.timerExit);
+    if (this.timerFinish !== -1) clearTimeout(this.timerFinish);
+    if (this.timerProgress1 !== -1) clearTimeout(this.timerProgress1);
+    if (this.timerProgress2 !== -1) clearTimeout(this.timerProgress2);
+    if (this.timerProgress3 !== -1) clearTimeout(this.timerProgress3);
   }
 
   onPageShow(): void {
@@ -67,7 +89,7 @@ struct Index {
   }
 
   private navigateTo(name: string): void {
-    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage') {
+    if (!this.loggedIn && name !== 'Index' && name !== 'ProfilePage' && name !== 'AiAssistantPage') {
       this.showLoginRequiredDialog();
       return;
     }
@@ -95,6 +117,7 @@ struct Index {
     }
     this.pageStack.clear();
     this.pageStack.pushPath({ name: name });
+    console.info('跳转目标：' + name);
   }
 
   // 中间的上报按钮是快捷动作：打开上报流程，但不修改底部导航选中态。
@@ -301,8 +324,7 @@ struct Index {
             this.tasks = EventService.getAllTasks().slice();
           },
           onLogout: (): void => this.completeLogout(),
-          onManageAccount: (): void => this.navigateTo('AccountPage'),
-          onOpenAi: (): void => this.navigateTo('AiAssistantPage')
+          onManageAccount: (): void => this.navigateTo('AccountPage')
         })
       }
       .title('我').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
@@ -316,9 +338,11 @@ struct Index {
       .title('管理倒计时').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'AiAssistantPage') {
       NavDestination() {
-        AiAssistantPage({ pageStack: this.pageStack })
+        AiAssistantPage()
       }
-      .title('AI 助手').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
+      .title('AI 助手')
+      .hideTitleBar(true)
+      .systemTransition(NavigationSystemTransitionType.FADE);
     }
   }
 
@@ -841,7 +865,7 @@ struct Index {
   @Builder
   private reportActionItem() {
     Column() {
-      Stack({ alignContent: Alignment.Center }) {
+      Stack() {
         Row()
           .width(52).height(52).borderRadius(26)
           .linearGradient({ angle: 140, colors: [['#4C8DF6', 0], ['#2563EB', 1]] })
@@ -853,8 +877,8 @@ struct Index {
           .width(3).height(20).borderRadius(2)
           .backgroundColor('#FFFFFF')
       }
-      // 裁剪整个图标容器为圆形；不对矩形 Stack 投影，避免圆外出现浅色方框。
-      .width(52).height(52).borderRadius(26).clip(true)
+      .width(52).height(52)
+      .shadow({ radius: 18, color: 'rgba(37, 99, 235, 0.34)', offsetY: 8 })
       .translate({ y: -30 })
       .scale({ x: this.reportPressed ? 0.94 : 1, y: this.reportPressed ? 0.94 : 1 })
       .animation({ duration: 220, curve: curves.cubicBezierCurve(0.34, 1.4, 0.64, 1) })
@@ -877,6 +901,40 @@ struct Index {
     .height(58)
     .alignItems(HorizontalAlign.Center)
     .justifyContent(FlexAlign.Start)
+  }
+
+  private startSplash(): void {
+    this.getUIContext().animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
+      this.splashOpacity = 1;
+      this.splashScale = 1;
+      this.splashOffsetY = 0;
+    });
+    this.getUIContext().animateTo({ duration: 1500, curve: Curve.EaseOut }, () => {
+      this.splashProgress = 100;
+    });
+    this.timerProgress1 = setTimeout(() => this.splashStepText = '正在加载本地安全数据与规则库...', 400);
+    this.timerProgress2 = setTimeout(() => this.splashStepText = '正在连接网格化安防协同控制台...', 900);
+    this.timerProgress3 = setTimeout(() => this.splashStepText = '智安核心引擎就绪 · 防护在线', 1450);
+    this.timerExit = setTimeout(() => {
+      this.getUIContext().animateTo({ duration: 450, curve: Curve.EaseIn }, () => {
+        this.splashOpacity = 0;
+        this.splashScale = 0.96;
+      });
+    }, 1850);
+    this.timerFinish = setTimeout(() => {
+      this.getUIContext().animateTo({ duration: 500, curve: Curve.EaseOut }, () => this.homeReady = true);
+      this.splashVisible = false;
+    }, 2350);
+  }
+
+  private skipSplash(): void {
+    if (this.timerProgress1 !== -1) clearTimeout(this.timerProgress1);
+    if (this.timerProgress2 !== -1) clearTimeout(this.timerProgress2);
+    if (this.timerProgress3 !== -1) clearTimeout(this.timerProgress3);
+    if (this.timerExit !== -1) clearTimeout(this.timerExit);
+    if (this.timerFinish !== -1) clearTimeout(this.timerFinish);
+    this.homeReady = true;
+    this.splashVisible = false;
   }
 
   build() {
@@ -941,7 +999,7 @@ struct Index {
                         Text('日常 · 学习 · 校园安全')
                           .fontSize(11)
                           .fontColor(AppTheme.muted)
-                        Text('功能预留，点击进入')
+                        Text('点击开始安全咨询')
                           .fontSize(10)
                           .fontColor(AppTheme.accent)
                       }
@@ -958,7 +1016,9 @@ struct Index {
                     .backgroundColor(AppTheme.surface)
                     .border({ width: 1, color: AppTheme.line })
                     .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
-                    .onClick(() => this.navigateTo('AiAssistantPage'))
+                    .onClick(() => {
+                      this.navigateTo('AiAssistantPage');
+                    })
                     Row({ space: 10 }) {
                       this.quickAction('隐患上报', '', $r('app.media.ic_report'), '#26BBF6', 'ReportPage')
                       this.quickAction('一键求助', '', $r('app.media.ic_phone'), '#747DFF', 'EmergencyContactPage')
@@ -1059,10 +1119,13 @@ struct Index {
             }
             .width('100%').height('100%')
           }
-          .width('100%').layoutWeight(1).hideTitleBar(true).navDestination(this.pageMap)
+          .width('100%')
+          .layoutWeight(1)
+          .mode(NavigationMode.Stack)
+          .hideTitleBar(true)
+          .navDestination(this.pageMap)
 
           // 底部导航栏：四个页面入口 + 中间凸起的上报快捷动作。
-          if (!this.keyboardVisible) {
           Row() {
             this.tabItem('Index', '首页')
             this.tabItem('EventPage', this.isPersonalUser() ? '记录' : '事件')
@@ -1075,25 +1138,85 @@ struct Index {
           .shadow({ radius: 12, color: 'rgba(24, 60, 110, 0.05)', offsetY: -2 })
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
           .clip(false)
-          }
         }
       }
       .width('100%').height('100%').backgroundColor(AppTheme.canvas)
 
+      // 开屏以静态秩序和细线构图呈现品牌，不再使用旧版科技光晕。
+      if (this.splashVisible) {
+        Column() {
+          Row() {
+            Blank()
+            Text('跳过')
+              .fontSize(12).fontColor(AppTheme.accent)
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .borderRadius(AppTheme.radiusSmall).border({ width: 1, color: AppTheme.lineStrong })
+              .backgroundColor(AppTheme.surface)
+              .onClick(() => this.skipSplash())
+          }
+          .width('100%').padding({ top: 52, right: 20 })
+
+          Column({ space: 20 }) {
+            Stack() {
+              Row()
+                .width(112).height(112).borderRadius(AppTheme.radiusLarge)
+                .border({ width: 1, color: AppTheme.lineStrong })
+              Row()
+                .width(94).height(94).borderRadius(AppTheme.radiusMedium)
+                .backgroundColor(AppTheme.accentSoft)
+              Row() {
+                Image($r('app.media.ic_shield'))
+                  .width(38).height(38).fillColor(Color.White)
+              }
+              .width(68).height(68).borderRadius(AppTheme.radiusMedium).backgroundColor(AppTheme.accent)
+              .justifyContent(FlexAlign.Center)
+              .shadow({ radius: 16, color: AppTheme.glowBlue, offsetY: 4 })
+            }
+            .scale({ x: this.splashScale, y: this.splashScale })
+            .opacity(this.splashOpacity)
+
+            Column({ space: 9 }) {
+              Text('鸿蒙智安')
+                .fontSize(30)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppTheme.ink)
+                .letterSpacing(2)
+              Text('CAMPUS SAFETY WORKBENCH')
+                .fontSize(10)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppTheme.bronze)
+                .letterSpacing(1)
+              Text('守秩序之常，护求学之安')
+                .fontSize(13)
+                .fontColor(AppTheme.inkSoft)
+            }
+            .opacity(this.splashOpacity).translate({ y: this.splashOffsetY })
+
+            Column({ space: 10 }) {
+              Row() {
+                Row().width(this.splashProgress * 1.8).height(3).borderRadius(2).backgroundColor(AppTheme.accent)
+              }
+              .width(180).height(3).borderRadius(2).backgroundColor(AppTheme.surfaceSubtle)
+
+              Row() {
+                Text(this.splashStepText).fontSize(10).fontColor(AppTheme.muted).layoutWeight(1)
+                Text(Math.round(this.splashProgress) + '%').fontSize(11).fontWeight(FontWeight.Bold).fontColor(AppTheme.accent)
+              }
+              .width(180)
+            }
+            .opacity(this.splashOpacity).translate({ y: this.splashOffsetY })
+          }
+          .justifyContent(FlexAlign.Center)
+
+          Blank()
+          Text('端侧守护 · 可信协同 · 日常安宁')
+            .fontSize(10).fontColor(AppTheme.muted).margin({ bottom: 48 })
+        }
+        .width('100%').height('100%').backgroundColor(AppTheme.canvas)
+        .justifyContent(FlexAlign.Center)
+        .onAppear(() => this.startSplash())
+      }
     }
     .width('100%').height('100%').backgroundColor(AppTheme.canvas)
-    .onAreaChange((oldArea: Area, area: Area) => {
-      // Android adjustResize shrinks the root before older hosts expose a keyboard event.
-      const width: number = Number(area.width);
-      const height: number = Number(area.height);
-      if (Math.abs(width - this.lastWidth) > 1) {
-        this.fullHeight = height;
-        this.lastWidth = width;
-        this.keyboardVisible = false;
-      } else {
-        this.fullHeight = Math.max(this.fullHeight, height);
-        this.keyboardVisible = this.fullHeight - height > 120;
-      }
-    })
   }
 }

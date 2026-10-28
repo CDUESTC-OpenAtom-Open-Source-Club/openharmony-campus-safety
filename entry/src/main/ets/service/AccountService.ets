@@ -134,7 +134,7 @@ export class AccountService {
     if (AccountService.findByUsername(username) !== undefined) {
       return { success: false, message: '该账号已被使用' };
     }
-    const account: StoredAccount = await AccountService.createAccount(
+    const account: StoredAccount = AccountService.createAccount(
       AccountService.createUserId('user'), username.trim().toLowerCase(), name.trim(), role, password
     );
     AccountService.accounts.push(account);
@@ -178,7 +178,7 @@ export class AccountService {
       id: AccountService.createUserId('invite'),
       role: role,
       codeSalt: AccountService.bytesToHex(salt),
-      codeHash: await AccountService.derivePassword(code, salt),
+      codeHash: AccountService.derivePassword(code, salt),
       expiresAt: Date.now() + AccountService.INVITATION_DURATION_MILLIS,
       usedAt: 0,
       createdBy: AccountService.currentUser.id
@@ -199,15 +199,14 @@ export class AccountService {
       return { success: false, message: '该账号已被使用' };
     }
     const code: string = invitationCode.trim().toUpperCase();
-    let invitation: StoredInternalInvitation | undefined = undefined;
-    for (const item of AccountService.invitations) {
-      if (item.usedAt === 0 && item.expiresAt > Date.now() &&
-        await AccountService.verifySecret(code, item.codeHash, item.codeSalt)) { invitation = item; break; }
-    }
+    const invitation: StoredInternalInvitation | undefined = AccountService.invitations.find(
+      (item: StoredInternalInvitation) => item.usedAt === 0 && item.expiresAt > Date.now() &&
+        AccountService.verifySecret(code, item.codeHash, item.codeSalt)
+    );
     if (invitation === undefined) {
       return { success: false, message: '内部邀请码无效、已使用或已过期' };
     }
-    const account: StoredAccount = await AccountService.createAccount(
+    const account: StoredAccount = AccountService.createAccount(
       AccountService.createUserId('internal'), username.trim().toLowerCase(), name.trim(), invitation.role, password
     );
     invitation.usedAt = Date.now();
@@ -263,7 +262,7 @@ export class AccountService {
     if (account.lockedUntil > Date.now()) {
       return { success: false, message: '登录已暂时锁定，请 5 分钟后重试或联系管理员' };
     }
-    if (!await AccountService.verifyPassword(password, account)) {
+    if (!AccountService.verifyPassword(password, account)) {
       account.failedAttempts++;
       if (account.failedAttempts >= AccountService.MAX_FAILED_ATTEMPTS) {
         account.failedAttempts = 0;
@@ -301,12 +300,12 @@ export class AccountService {
     const account: StoredAccount | undefined = AccountService.accounts.find(
       (item: StoredAccount) => item.user.id === AccountService.currentUser?.id
     );
-    if (account === undefined || !await AccountService.verifyPassword(oldPassword, account)) {
+    if (account === undefined || !AccountService.verifyPassword(oldPassword, account)) {
       return { success: false, message: '原密码错误' };
     }
     const salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(16).data;
     account.passwordSalt = AccountService.bytesToHex(salt);
-    account.passwordHash = await AccountService.derivePassword(newPassword, salt);
+    account.passwordHash = AccountService.derivePassword(newPassword, salt);
     await AccountService.persistAccounts();
     return { success: true, message: '密码修改成功' };
   }
@@ -324,31 +323,31 @@ export class AccountService {
     AccountService.pref = null;
   }
 
-  private static async createAccount(
+  private static createAccount(
     id: string,
     username: string,
     name: string,
     role: UserRole,
     password: string
-  ): Promise<StoredAccount> {
+  ): StoredAccount {
     const salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(16).data;
     return {
       user: { id: id, name: name, role: role },
       username: username,
       passwordSalt: AccountService.bytesToHex(salt),
-      passwordHash: await AccountService.derivePassword(password, salt),
+      passwordHash: AccountService.derivePassword(password, salt),
       active: true,
       failedAttempts: 0,
       lockedUntil: 0
     };
   }
 
-  private static async verifyPassword(password: string, account: StoredAccount): Promise<boolean> {
+  private static verifyPassword(password: string, account: StoredAccount): boolean {
     return AccountService.verifySecret(password, account.passwordHash, account.passwordSalt);
   }
 
-  private static async verifySecret(secret: string, expectedHash: string, saltHex: string): Promise<boolean> {
-    const actualHash: string = await AccountService.derivePassword(secret, AccountService.hexToBytes(saltHex));
+  private static verifySecret(secret: string, expectedHash: string, saltHex: string): boolean {
+    const actualHash: string = AccountService.derivePassword(secret, AccountService.hexToBytes(saltHex));
     if (actualHash.length !== expectedHash.length) {
       return false;
     }
@@ -393,7 +392,7 @@ export class AccountService {
     await AccountService.pref.flush();
   }
 
-  private static async derivePassword(password: string, salt: Uint8Array): Promise<string> {
+  private static derivePassword(password: string, salt: Uint8Array): string {
     const kdf: cryptoFramework.Kdf = cryptoFramework.createKdf('PBKDF2|SHA256');
     const spec: cryptoFramework.PBKDF2Spec = {
       algName: 'PBKDF2',
@@ -402,7 +401,7 @@ export class AccountService {
       iterations: AccountService.ITERATIONS,
       keySize: AccountService.KEY_SIZE
     };
-    return AccountService.bytesToHex((await kdf.generateSecret(spec)).data);
+    return AccountService.bytesToHex(kdf.generateSecretSync(spec).data);
   }
 
   private static bytesToHex(data: Uint8Array): string {

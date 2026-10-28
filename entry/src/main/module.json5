@@ -10,8 +10,9 @@
     "deliveryWithInstall": true,
     "installationFree": false,
     "requestPermissions": [
-      { "name": "ohos.permission.INTERNET" },
-      { "name": "ohos.permission.PRIVACY_WINDOW" }
+      {
+        "name": "ohos.permission.INTERNET"
+      }
     ],
     "pages": "$profile:main_pages",
     "abilities": [
