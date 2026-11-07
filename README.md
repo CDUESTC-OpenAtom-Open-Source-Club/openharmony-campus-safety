@@ -183,7 +183,7 @@ Release 使用本机被 Git 忽略的 AGC 签名配置，通过 `python scripts/
 
 AGC 已发布应用为「校安通」`0.2.5`，APPID 为 `6917618790016610414`。当前仓库 `1.0.0` 尚未提交发布。签名配置因含本机路径和口令未进入公开仓库；本地构建是否签名不代表商店是否已发布。
 
-当前 1.0.0 鸿蒙签名包与校验值发布在 [校安通 v1.0.0 Release](https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v1.0.0)。其中 APP 用于应用市场，HAP 为鸿蒙模块包；均以 ZIP 提供，解压后使用。当前版本没有发布经过验证的 Android 安装包。
+当前 1.0.0 鸿蒙签名包与校验值发布在 [校安通 v1.0.0 Release](https://github.com/CDUESTC-OpenAtom-Open-Source-Club/openharmony-campus-safety/releases/tag/v1.0.0)。提供鸿蒙 HAP 安装包，以 ZIP 提供，解压后使用。当前版本没有发布经过验证的 Android 安装包。
 
 以下为早期 GitHub `v0.2.0` 的历史文件名，保留原始名称以便定位归档，不用于当前商店展示或新版本出包：
 
