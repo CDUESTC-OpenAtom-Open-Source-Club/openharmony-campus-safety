@@ -1,3 +1,4 @@
+import { CampusInputStyle, CampusTextAreaStyle } from '../common/InputStyles';
 import {
   Task,
   TaskStatus
@@ -467,8 +468,8 @@ export struct TaskPage {
           this.evidenceBlock(task, '处置前证据', task.beforeAttachmentPaths ?? [], true, true)
           this.evidenceBlock(task, '处置后证据', task.afterAttachmentPaths ?? [], false, true)
 
-          TextInput({
-            placeholder: '请输入现场处置措施与结果反馈...',
+          TextArea({
+            placeholder: '填写处置结果…',
             text: this.processingTaskId === task.id ? this.resultText : task.result ?? ''
           })
             .width('100%')
@@ -486,6 +487,7 @@ export struct TaskPage {
               this.processingTaskId = task.id;
               this.resultText = value;
             })
+            .attributeModifier(new CampusTextAreaStyle())
 
           Button('提交处置结果待审核')
             .width('100%')
@@ -533,7 +535,7 @@ export struct TaskPage {
 
           if (this.can(AppPermission.REVIEW_TASK)) {
             TextInput({
-              placeholder: '驳回时请输入返工原因...',
+              placeholder: '填写返工原因',
               text: this.reviewTaskId === task.id ? this.rejectionReason : ''
             })
               .width('100%')
@@ -550,6 +552,7 @@ export struct TaskPage {
                 this.reviewTaskId = task.id;
                 this.rejectionReason = value;
               })
+              .attributeModifier(new CampusInputStyle())
 
             Row({ space: 8 }) {
               Button('驳回返工')

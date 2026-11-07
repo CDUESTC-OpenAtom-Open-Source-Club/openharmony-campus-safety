@@ -1,5 +1,5 @@
 {
-  "crossplatform": true,
+  "crossplatform": false,
   "modules": [
     "entry"
   ]

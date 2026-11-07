@@ -1,5 +1,5 @@
 /**
- * 鸿蒙智安参考图浅蓝校园安防设计令牌。
+ * 校安通参考图浅蓝校园安防设计令牌。
  *
  * 以参考图的浅蓝白为画布，以清晰的协同蓝构建信息秩序；
  * 红、绿、琥珀色仅用于具有明确业务含义的状态。
@@ -17,6 +17,9 @@ export class AppTheme {
   static readonly muted: string = '#8A97AF';
   static readonly line: string = '#E7EEF8';
   static readonly lineStrong: string = '#B6CDF0';
+  static readonly inputPlaceholder: string = '#6B778A';
+  static readonly inputTextSize: number = 15;
+  static readonly inputRadius: number = 12;
 
   // 核心安防主色与辅助色
   static readonly accent: string = '#1677FF';

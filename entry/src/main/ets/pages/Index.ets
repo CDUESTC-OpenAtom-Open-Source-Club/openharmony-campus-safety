@@ -67,6 +67,11 @@ struct Index {
   private timerProgress3: number = -1;
 
   aboutToAppear(): void {
+    this.pageStack.setInterception({
+      didShow: (_from: NavDestinationContext | 'navBar', to: NavDestinationContext | 'navBar'): void => {
+        this.currentTab = typeof to === 'string' ? 'Index' : to.pathInfo.name;
+      }
+    });
     this.refreshEmergencyPhone();
     this.refreshSchedule();
     this.refreshCountdowns();
@@ -106,9 +111,7 @@ struct Index {
       promptAction.showToast({ message: '当前账号暂无数据统计权限' });
       return;
     }
-    if (name !== 'ReportPage' && name !== 'CountdownManagePage') {
-      this.currentTab = name;
-    }
+    this.currentTab = name;
     if (name === 'Index') {
       this.events = EventService.getAllEvents().slice();
       this.tasks = EventService.getAllTasks().slice();
@@ -120,13 +123,14 @@ struct Index {
     console.info('跳转目标：' + name);
   }
 
-  // 中间的上报按钮是快捷动作：打开上报流程，但不修改底部导航选中态。
+  // 中间按钮打开上报流程；未处于主导航页面时，不保留先前页面的高亮。
   private openReportFlow(): void {
     if (!this.loggedIn) {
       this.showLoginRequiredDialog();
       return;
     }
     this.pageStack.clear();
+    this.currentTab = 'ReportPage';
     this.pageStack.pushPath({ name: 'ReportPage' });
   }
 
@@ -338,7 +342,10 @@ struct Index {
       .title('管理倒计时').hideTitleBar(true).systemTransition(NavigationSystemTransitionType.FADE);
     } else if (name === 'AiAssistantPage') {
       NavDestination() {
-        AiAssistantPage()
+        AiAssistantPage({ onDataChanged: (): void => { this.refreshSchedule(); this.refreshCountdowns(); }, onNavigate: (route: string): void => {
+          const allowed: string[] = ['ReportPage', 'TaskPage', 'EmergencyContactPage', 'CountdownManagePage', 'ProfilePage'];
+          if (allowed.includes(route)) this.navigateTo(route);
+        } })
       }
       .title('AI 助手')
       .hideTitleBar(true)
@@ -752,84 +759,84 @@ struct Index {
   }
 
   @Builder
-  private tabIcon(key: string, selected: boolean) {
+  private tabIcon(key: string) {
     Stack() {
       if (key === 'Index') {
         // 首页：屋顶线 + 房屋，选中时房屋实心。
         Row()
           .width(12).height(1.8).borderRadius(2)
-          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
           .rotate({ angle: -42 })
           .position({ x: 1.5, y: 6.5 })
         Row()
           .width(12).height(1.8).borderRadius(2)
-          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
           .rotate({ angle: 42 })
           .position({ x: 9.5, y: 6.5 })
         Row()
           .width(14).height(11)
           .borderRadius(2)
-          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.8, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 4.5, y: 10 })
         Row()
           .width(4).height(6)
           .borderRadius(1)
-          .border({ width: selected ? 0 : 1, color: '#9CA3AF' })
-          .backgroundColor(selected ? '#FFFFFF' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1, color: '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#FFFFFF' : '#FFFFFF')
           .position({ x: 9.5, y: 15 })
       } else if (key === 'EventPage') {
         // 记录：文档外框和三条内容线。
         Row()
           .width(15).height(19)
           .borderRadius(2.5)
-          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.8, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 4, y: 2 })
         Row().width(8).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#FFFFFF' : '#9CA3AF')
           .position({ x: 7.5, y: 7 })
         Row().width(8).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#FFFFFF' : '#9CA3AF')
           .position({ x: 7.5, y: 11 })
         Row().width(6).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#FFFFFF' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#FFFFFF' : '#9CA3AF')
           .position({ x: 7.5, y: 15 })
       } else if (key === 'TaskPage') {
         // 任务：三项清单，选中时勾选框实心。
         Row().width(5).height(5).borderRadius(1.2)
-          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.6, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 2.5, y: 3 })
         Row().width(5).height(5).borderRadius(1.2)
-          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.6, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 2.5, y: 9 })
         Row().width(5).height(5).borderRadius(1.2)
-          .border({ width: selected ? 0 : 1.6, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.6, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 2.5, y: 15 })
         Row().width(12).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
           .position({ x: 9, y: 4.8 })
         Row().width(12).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
           .position({ x: 9, y: 10.8 })
         Row().width(12).height(1.6).borderRadius(1)
-          .backgroundColor(selected ? '#185FA5' : '#9CA3AF')
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#9CA3AF')
           .position({ x: 9, y: 16.8 })
       } else {
         // 我的：头像和肩部轮廓，选中时采用实心人形。
         Row()
           .width(7.5).height(7.5).borderRadius(4)
-          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.8, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 7.75, y: 1.5 })
         Row()
           .width(17).height(8)
           .borderRadius(8)
-          .border({ width: selected ? 0 : 1.8, color: selected ? '#185FA5' : '#9CA3AF' })
-          .backgroundColor(selected ? '#185FA5' : '#FFFFFF')
+          .border({ width: this.currentTab === key ? 0 : 1.8, color: this.currentTab === key ? '#185FA5' : '#9CA3AF' })
+          .backgroundColor(this.currentTab === key ? '#185FA5' : '#FFFFFF')
           .position({ x: 3, y: 13 })
       }
     }
@@ -841,7 +848,7 @@ struct Index {
   @Builder
   private tabItem(key: string, label: string) {
     Column({ space: 3 }) {
-      this.tabIcon(key, this.currentTab === key)
+      this.tabIcon(key)
       Text(label)
         .fontSize(10.5)
         .fontWeight(this.currentTab === key ? FontWeight.Medium : FontWeight.Normal)
@@ -865,7 +872,7 @@ struct Index {
   @Builder
   private reportActionItem() {
     Column() {
-      Stack() {
+      Stack({ alignContent: Alignment.Center }) {
         Row()
           .width(52).height(52).borderRadius(26)
           .linearGradient({ angle: 140, colors: [['#4C8DF6', 0], ['#2563EB', 1]] })
@@ -877,8 +884,8 @@ struct Index {
           .width(3).height(20).borderRadius(2)
           .backgroundColor('#FFFFFF')
       }
-      .width(52).height(52)
-      .shadow({ radius: 18, color: 'rgba(37, 99, 235, 0.34)', offsetY: 8 })
+      // Keep the whole icon circular; a shadow on the rectangular Stack produces a faint square.
+      .width(52).height(52).borderRadius(26).clip(true)
       .translate({ y: -30 })
       .scale({ x: this.reportPressed ? 0.94 : 1, y: this.reportPressed ? 0.94 : 1 })
       .animation({ duration: 220, curve: curves.cubicBezierCurve(0.34, 1.4, 0.64, 1) })
@@ -894,7 +901,7 @@ struct Index {
       Text('上报')
         .fontSize(10.5)
         .fontWeight(FontWeight.Medium)
-        .fontColor('#185FA5')
+        .fontColor(this.currentTab === 'ReportPage' ? '#185FA5' : '#9CA3AF')
         .translate({ y: -14 })
     }
     .layoutWeight(1)
@@ -914,7 +921,7 @@ struct Index {
     });
     this.timerProgress1 = setTimeout(() => this.splashStepText = '正在加载本地安全数据与规则库...', 400);
     this.timerProgress2 = setTimeout(() => this.splashStepText = '正在连接网格化安防协同控制台...', 900);
-    this.timerProgress3 = setTimeout(() => this.splashStepText = '智安核心引擎就绪 · 防护在线', 1450);
+    this.timerProgress3 = setTimeout(() => this.splashStepText = '校安通服务已就绪 · 防护在线', 1450);
     this.timerExit = setTimeout(() => {
       this.getUIContext().animateTo({ duration: 450, curve: Curve.EaseIn }, () => {
         this.splashOpacity = 0;
@@ -978,47 +985,47 @@ struct Index {
                       Divider().vertical(true).height(32).color(AppTheme.line)
                       this.homeMetric('今日上报', this.events.filter((e: SecurityEvent) => e.reportTime.startsWith(new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2) + '-' + ('0' + new Date().getDate()).slice(-2))).length)
                     }.width('100%').padding({ top: 14, bottom: 14 }).backgroundColor(AppTheme.surface).borderRadius(12)
-                    Row({ space: 12 }) {
-                      Column({ space: 6 }) {
-                        Text('AI')
-                          .fontSize(13)
-                          .fontWeight(FontWeight.Bold)
-                          .fontColor(Color.White)
-                      }
-                      .width(44)
-                      .height(44)
-                      .borderRadius(14)
-                      .backgroundColor(AppTheme.accent)
-                      .justifyContent(FlexAlign.Center)
+                      Row({ space: 12 }) {
+                        Column({ space: 6 }) {
+                          Text('AI')
+                            .fontSize(13)
+                            .fontWeight(FontWeight.Bold)
+                            .fontColor(Color.White)
+                        }
+                        .width(44)
+                        .height(44)
+                        .borderRadius(14)
+                        .backgroundColor(AppTheme.accent)
+                        .justifyContent(FlexAlign.Center)
 
-                      Column({ space: 4 }) {
-                        Text('智安 AI 助手')
-                          .fontSize(15)
-                          .fontWeight(FontWeight.Bold)
-                          .fontColor(AppTheme.ink)
-                        Text('日常 · 学习 · 校园安全')
-                          .fontSize(11)
-                          .fontColor(AppTheme.muted)
-                        Text('点击开始安全咨询')
-                          .fontSize(10)
+                        Column({ space: 4 }) {
+                          Text('小安')
+                            .fontSize(15)
+                            .fontWeight(FontWeight.Bold)
+                            .fontColor(AppTheme.ink)
+                          Text('本地提醒 · 安全提示 · 在线问答')
+                            .fontSize(11)
+                            .fontColor(AppTheme.muted)
+                          Text('日常安排与校园安全，随时问小安')
+                            .fontSize(10)
+                            .fontColor(AppTheme.accent)
+                        }
+                        .alignItems(HorizontalAlign.Start)
+                        .layoutWeight(1)
+
+                        Text('›')
+                          .fontSize(26)
                           .fontColor(AppTheme.accent)
                       }
-                      .alignItems(HorizontalAlign.Start)
-                      .layoutWeight(1)
-
-                      Text('›')
-                        .fontSize(26)
-                        .fontColor(AppTheme.accent)
-                    }
-                    .width('100%')
-                    .padding({ left: 14, right: 14, top: 13, bottom: 13 })
-                    .borderRadius(16)
-                    .backgroundColor(AppTheme.surface)
-                    .border({ width: 1, color: AppTheme.line })
-                    .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
-                    .onClick(() => {
-                      this.navigateTo('AiAssistantPage');
-                    })
+                      .width('100%')
+                      .padding({ left: 14, right: 14, top: 13, bottom: 13 })
+                      .borderRadius(16)
+                      .backgroundColor(AppTheme.surface)
+                      .border({ width: 1, color: AppTheme.line })
+                      .shadow({ radius: 8, color: AppTheme.cardShadow, offsetY: 2 })
+                      .onClick(() => {
+                        this.navigateTo('AiAssistantPage');
+                      })
                     Row({ space: 10 }) {
                       this.quickAction('隐患上报', '', $r('app.media.ic_report'), '#26BBF6', 'ReportPage')
                       this.quickAction('一键求助', '', $r('app.media.ic_phone'), '#747DFF', 'EmergencyContactPage')
@@ -1176,7 +1183,7 @@ struct Index {
             .opacity(this.splashOpacity)
 
             Column({ space: 9 }) {
-              Text('鸿蒙智安')
+              Text('校安通')
                 .fontSize(30)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(AppTheme.ink)

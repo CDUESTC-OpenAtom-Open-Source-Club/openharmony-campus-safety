@@ -1,3 +1,4 @@
+import { CampusInputStyle } from '../common/InputStyles';
 import { promptAction } from '@kit.ArkUI';
 import { User } from '../model/User';
 import { AccountService, InvitationResult, LoginResult, ManagedAccount } from '../service/AccountService';
@@ -127,7 +128,7 @@ export struct AccountPage {
             .width('100%')
 
             Column({ space: 8 }) {
-              TextInput({ placeholder: '原密码', text: this.oldPassword })
+              TextInput({ placeholder: '当前密码', text: this.oldPassword })
                 .type(InputType.Password)
                 .height(42)
                 .backgroundColor(AppTheme.surfaceMuted)
@@ -136,8 +137,9 @@ export struct AccountPage {
                 .fontSize(12)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => this.oldPassword = value)
+                .attributeModifier(new CampusInputStyle())
 
-              TextInput({ placeholder: '新密码（至少 10 位，需含字母与数字）', text: this.newPassword })
+              TextInput({ placeholder: '设置新密码', text: this.newPassword })
                 .type(InputType.Password)
                 .height(42)
                 .backgroundColor(AppTheme.surfaceMuted)
@@ -146,8 +148,9 @@ export struct AccountPage {
                 .fontSize(12)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => this.newPassword = value)
+                .attributeModifier(new CampusInputStyle())
 
-              TextInput({ placeholder: '再次确认新密码', text: this.confirmPassword })
+              TextInput({ placeholder: '再次输入新密码', text: this.confirmPassword })
                 .type(InputType.Password)
                 .height(42)
                 .backgroundColor(AppTheme.surfaceMuted)
@@ -156,6 +159,7 @@ export struct AccountPage {
                 .fontSize(12)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => this.confirmPassword = value)
+                .attributeModifier(new CampusInputStyle())
             }
             .width('100%')
 

@@ -80,7 +80,7 @@ export class CampusSafetyCardService {
       headline: headline,
       primary: primary,
       secondary: secondary,
-      hint: '点击打开鸿蒙智安'
+      hint: '点击打开校安通'
     };
   }
 }

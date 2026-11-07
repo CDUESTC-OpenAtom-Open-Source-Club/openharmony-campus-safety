@@ -1,3 +1,4 @@
+import { CampusInputStyle } from '../common/InputStyles';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { EmergencyContactService } from '../service/EmergencyContactService';
@@ -84,7 +85,6 @@ export struct EmergencyContactPage {
             .width('100%')
 
             TextInput({
-              placeholder: '请输入 6—20 位有效电话号码（支持 + 号）',
               text: this.phone
             })
               .type(InputType.PhoneNumber)
@@ -98,6 +98,7 @@ export struct EmergencyContactPage {
               .onChange((value: string) => {
                 this.phone = value;
               })
+              .attributeModifier(new CampusInputStyle())
           }
           .width('100%')
           .padding(16)

@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { User, UserRole } from '../model/User';
+import { AiConfigService } from './AiConfigService';
 
 interface StoredAccount {
   user: User;
@@ -283,6 +284,7 @@ export class AccountService {
   }
 
   static async logout(): Promise<void> {
+    AiConfigService.clearSession();
     AccountService.currentUser = null;
     if (AccountService.pref !== null) {
       await AccountService.pref.put(AccountService.KEY_CURRENT_USER_ID, '');

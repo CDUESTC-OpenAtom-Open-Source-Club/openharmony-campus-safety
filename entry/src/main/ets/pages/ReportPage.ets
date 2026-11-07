@@ -1,3 +1,4 @@
+import { CampusInputStyle, CampusTextAreaStyle } from '../common/InputStyles';
 import {
   EventType,
   EventPriority
@@ -138,14 +139,16 @@ export struct ReportPage {
           }.width('100%')
           Column() {
             this.sectionHeader('具体位置', true, '')
-            TextInput({ placeholder: '请输入隐患所在位置', text: this.location }).height(44).fontSize(13)
+            TextInput({ text: this.location }).height(44).fontSize(13)
               .backgroundColor(AppTheme.surfaceMuted).borderRadius(8).onChange((value: string) => { this.location = value; })
+              .attributeModifier(new CampusInputStyle())
           }.width('100%')
           Column() {
             this.sectionHeader('详细描述', true, '')
-            TextArea({ placeholder: '请详细描述发现的安全隐患情况…', text: this.description })
+            TextArea({ text: this.description })
               .height(112).fontSize(13).backgroundColor(AppTheme.surfaceMuted).borderRadius(8)
               .onChange((value: string) => { this.description = value; })
+              .attributeModifier(new CampusTextAreaStyle())
           }.width('100%')
           Column() {
             this.sectionHeader('风险等级', true, '')
@@ -176,8 +179,9 @@ export struct ReportPage {
           }.width('100%')
           Column() {
             this.sectionHeader('联系人', false, '选填')
-            TextInput({ placeholder: '请输入姓名或联系电话', text: this.reporter }).height(44).fontSize(13)
+            TextInput({ text: this.reporter }).height(44).fontSize(13)
               .backgroundColor(AppTheme.surfaceMuted).borderRadius(8).onChange((value: string) => { this.reporter = value; })
+              .attributeModifier(new CampusInputStyle())
           }.width('100%')
         }.width('100%').padding(18).backgroundColor(AppTheme.surface).borderRadius(14)
       }.width('100%').layoutWeight(1).scrollBar(BarState.Off).padding({ left: 14, right: 14 })

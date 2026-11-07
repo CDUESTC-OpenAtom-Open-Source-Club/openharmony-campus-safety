@@ -168,7 +168,7 @@ export struct ProfilePage {
           Text('系统')
             .fontSize(10)
             .fontColor('rgba(255,255,255,0.7)')
-          Text('鸿蒙智安')
+          Text('校安通')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor(Color.White)
@@ -329,9 +329,9 @@ export struct ProfilePage {
       this.menuRow(
         $r('app.media.ic_calendar'),
         '安全说明',
-        '查看鸿蒙智安的安全协同说明',
+        '查看校安通的安全协同说明',
         AppTheme.success,
-        () => promptAction.showToast({ message: '鸿蒙智安：让校园安全协同更简单' })
+        () => promptAction.showToast({ message: '校安通：让校园安全协同更简单' })
       )
     }
     .width('100%')

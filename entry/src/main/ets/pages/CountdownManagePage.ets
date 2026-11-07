@@ -1,3 +1,6 @@
+import { CampusInputStyle } from '../common/InputStyles';
+import { PersonalDataMigrationService } from '../service/PersonalDataMigrationService';
+import { AccountService } from '../service/AccountService';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { CountdownEvent } from '../model/CountdownEvent';
@@ -43,9 +46,24 @@ export struct CountdownManagePage {
     this.loadEvents();
   }
 
+  @State private legacyPending: boolean = false;
+
+  private importLegacy(): void {
+    const owner: string = AccountService.getCurrentUser()?.id ?? '';
+    AlertDialog.show({ title: '导入旧倒计时？', message: '旧记录没有账号归属。仅当你确认这些记录属于自己时，才导入当前账号。原记录会保留。',
+      primaryButton: { value: '确认属于我并导入', action: async () => {
+        try {
+          await PersonalDataMigrationService.claim(getContext(this), 'countdown_events', 'countdown_events_v1', owner);
+          if (AccountService.getCurrentUser()?.id !== owner) return;
+          this.legacyPending = false; await this.loadEvents();
+        } catch (_) { promptAction.showToast({ message: '导入失败，请重试' }); }
+      } }, secondaryButton: { value: '取消', action: () => {} } });
+  }
+
   private async loadEvents(): Promise<void> {
     this.loading = true;
     try {
+      this.legacyPending = await PersonalDataMigrationService.pending(getContext(this), 'countdown_events', 'countdown_events_v1');
       this.events = await CountdownService.getEvents(getContext(this) as common.Context);
     } catch (error) {
       console.error('CountdownManagePage load failed: ' + JSON.stringify(error));
@@ -290,7 +308,7 @@ export struct CountdownManagePage {
             .fontSize(12)
             .fontColor(AppTheme.inkSoft)
             .width('100%')
-          TextInput({ placeholder: '例如：英语四级（CET-4）', text: this.formName })
+          TextInput({ text: this.formName })
             .fontSize(13)
             .height(42)
             .maxLength(20)
@@ -301,6 +319,7 @@ export struct CountdownManagePage {
             .onChange((value: string) => {
               this.formName = value.slice(0, 20);
             })
+            .attributeModifier(new CampusInputStyle(this.formTriedSave && this.formName.trim() === ''))
           if (this.formTriedSave && this.formName.trim() === '') {
             Text('请填写事件名称').fontSize(10).fontColor('#D0655E').width('100%')
           }
@@ -341,7 +360,7 @@ export struct CountdownManagePage {
             .fontSize(12)
             .fontColor(AppTheme.inkSoft)
             .width('100%')
-          TextInput({ placeholder: '例如：笔试、期末考试', text: this.formTag })
+          TextInput({ text: this.formTag })
             .fontSize(13)
             .height(42)
             .maxLength(8)
@@ -352,6 +371,7 @@ export struct CountdownManagePage {
             .onChange((value: string) => {
               this.formTag = value.slice(0, 8);
             })
+            .attributeModifier(new CampusInputStyle())
 
           Text('考试日期可能调整，预设日期请以官方通知为准。')
             .fontSize(10)
@@ -472,6 +492,10 @@ export struct CountdownManagePage {
 
         Scroll() {
           Column({ space: 10 }) {
+            if (this.legacyPending) {
+              Button('导入设备旧倒计时').onClick(() => this.importLegacy())
+                .fontColor(AppTheme.accent).backgroundColor(AppTheme.accentSoft)
+            }
             if (this.loading) {
               Text('正在读取倒计时…')
                 .fontSize(12)

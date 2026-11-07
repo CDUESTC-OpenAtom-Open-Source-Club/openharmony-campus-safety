@@ -1,3 +1,4 @@
+import { CampusInputStyle } from '../common/InputStyles';
 import {
   SecurityEvent,
   EventPriority,
@@ -112,7 +113,7 @@ export struct EventPage {
       // 搜索与双层分类过滤条
       Column({ space: 10 }) {
         TextInput({
-          placeholder: '输入事件名称、发生地点或工单编号...',
+          placeholder: '搜索事件、地点或编号',
           text: this.searchQuery
         })
           .width('100%')
@@ -125,6 +126,7 @@ export struct EventPage {
           .onChange((value: string) => {
             this.searchQuery = value;
           })
+          .attributeModifier(new CampusInputStyle())
 
         // 状态流转筛选
         Scroll() {

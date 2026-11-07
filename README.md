@@ -1,4 +1,4 @@
-# 鸿蒙智安 - 校园安全协同应用
+# 校安通 - 校园安全协同应用
 
 ![HarmonyOS](https://img.shields.io/badge/HarmonyOS-6.0-blue?style=flat-square&logo=huawei)
 ![ArkTS](https://img.shields.io/badge/Language-ArkTS-3178c6?style=flat-square)
@@ -6,7 +6,7 @@
 ![Stage](https://img.shields.io/badge/Model-Stage-success?style=flat-square)
 ![ArkUI-X](https://img.shields.io/badge/Cross--Platform-ArkUI--X-orange?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Stable-success?style=flat-square)
-![Version](https://img.shields.io/badge/Version-v0.2.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v1.0.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)
 
 基于 OpenHarmony / HarmonyOS 原生 ArkUI 与 ArkTS 开发的校园安全协同应用，覆盖「发现 - 确认 - 派单 - 处理 - 反馈 - 完成」的完整安全事件闭环，并通过 ArkUI-X 支持 Android 跨平台运行。
@@ -20,6 +20,8 @@
 本项目以「安全事件」为核心数据对象，将发现、确认、派单、处理、反馈、归档纳入统一流程，为管理人员、巡检人员和普通师生提供清晰、可追踪的协同工具。
 
 > 项目保持原生鸿蒙属性，核心功能未使用 WebView 或第三方 UI 框架替代 ArkUI。
+
+> 应用已以「校安通」名称在 AGC 审核通过并发布，已上架版本为 **0.2.5（不含 AI）**。当前仓库正在准备 **1.0.0** 更新；Debug 与 Release 均包含小安和本地模型；1.0.0 尚未确认通过 AGC 审核或上线。详见 [发布状态](RELEASE_STATUS.md)。
 
 ---
 
@@ -54,13 +56,13 @@
 
 ## 当前进度
 
-自 `v0.1.0-beta.2` Demo 起，项目于 2026-09-08 进入正式测试版开发，原 A/B/C 固定模块边界不再生效，后续工作按功能、里程碑、代码评审和测试责任协同推进。`v0.1.0-beta.1` ~ `v0.1.0-beta.3` 完成正式测试版功能补齐，当前版本 `v0.2.0` 在此基础上完成界面重构与签名发布流程完善。完整安排见 [正式测试版专业化迭代计划](docs/正式测试版专业化迭代计划.md)。
+应用已完成开发并以「校安通」名称发布到 AGC，商店已发布版本为 `0.2.5`。当前工程版本为 `1.0.0 / 1000100`，用于后续更新开发；正式提交前仍须核对 AGC 中已发布版本的 versionCode，确保新包版本号更高。早期开发安排见 [正式测试版专业化迭代计划](docs/正式测试版专业化迭代计划.md)。
 
 正式测试版已实现本地多角色账号、业务权限、真实任务指派、审核返工、图片证据与服务卡片。人工回归步骤与账号安全边界见 [正式测试版手动测试清单](docs/正式测试版手动测试清单.md) 和 [身份治理加固方案](docs/security-hardening/identity-governance/hardening.md)。
 
 M7 业务深化已完成四个阶段：上报页接入系统图片选择与应用私有目录保存，事件详情可查看现场证据和操作历史；普通用户可在“我的上报”中跟踪进度与最终反馈；巡检人员可提交处置前后图片；管理员可按本地安保账号真实派单并查看未分配、超时和待审核任务，任务责任时间随业务状态持久化。
 
-M8 已完成 HarmonyOS 原生校园安全服务卡片；M9 已完成真实统计口径与产品可信文案清理。M10 正在进行构建、测试与云手机集成验收，未验证能力不会作为已发布能力声明。
+M8 已完成 HarmonyOS 原生校园安全服务卡片；M9 已完成真实统计口径与产品可信文案清理。AGC `0.2.5` 已审核通过并发布；早期 M10 报告保留的是当轮测试结果，不代表当前商店发布状态。仓库 AI 功能与已发布的无 AI 版本分开记录，不作为商店已上线能力宣传。
 
 | 阶段 | 模块 | 状态 | 说明 |
 | :---: | :--- | :---: | :--- |
@@ -72,7 +74,7 @@ M8 已完成 HarmonyOS 原生校园安全服务卡片；M9 已完成真实统计
 | 6 | 应急联系方式与一键求助 | 完成 | 配置页、短信预填、拨号调用 |
 | 7 | 开屏与切换动效 | 完成 | 开屏动画、页面淡入动效 |
 | 8 | Android 跨平台 | 完成 | ArkUI-X 打包与真机安装验证 |
-| 9 | 签名与发布 | 历史 Demo | 旧 Beta Release 仅作历史记录，当前正式测试版需重新完成签名与云手机验收 |
+| 9 | 签名与发布 | 已上架 | 校安通 0.2.5 已通过 AGC 审核并发布；1.0.0 为当前更新开发版本 |
 | 10 | 学生课表 | 完成 | 校内课程表网格、课次切换与本地偏好存储 |
 
 ---
@@ -171,40 +173,22 @@ Release APK 输出位置：
 
 ## 发布签名
 
-签名材料、口令与 Android keystore 均保存在本地 `signing/` 目录，**不进入版本库**（见 `.gitignore`）。仓库中的构建配置不包含任何密钥或口令，因此克隆后可以直接构建未签名产物。
+签名材料、口令与 Android keystore 均保存在本地 `signing/` 目录，**不进入版本库**（见 `.gitignore`）。仓库中的构建配置不包含任何密钥或口令。本轮新增小安原生模型运行库，干净克隆需要先执行 `scripts/build-xiaoan-runtime.ps1`；构建 Debug 或 Release 包还需执行 `python scripts/prepare-xiaoan-model.py --bundle`。模型与运行库二进制不进入 Git，准备方式及兼容性边界见 [小安说明](AI_ASSISTANT.md)。
 
-Release 产物签名步骤：
+鸿蒙发布包使用 `python scripts/package-harmony-release.py` 构建。脚本读取被 Git 忽略的 `signing/active-harmony-release.json` 和对应目录的加密签名配置，临时启用当前发布签名并恢复工程配置，再校验 APP/HAP 签名、证书、Profile、Release 标记和包内模型。默认输出到 `release/`，也可通过 `--output-dir` 指定一个新的空目录；命令行无需填写签名口令。
 
-1. **HarmonyOS HAP**：先构建未签名 HAP，再用 SDK 的 `hap-sign-tool` 签名。
+Release 使用本机被 Git 忽略的 AGC 签名配置，通过 `python scripts/package-harmony-release.py` 生成并验证 APP 与 HAP；签名私钥和口令不得提交。Android 构建与签名需单独验证，历史 APK 不代表当前版本。
 
-   ```bash
-   hvigorw assembleHap --mode module -p product=default -p buildMode=release
-   ```
+## 发布状态与历史安装包
 
-   签名输入：`signing/OpenHarmony.p12`、`signing/OriginalAppReleaseChain.pem`、`signing/OpenHarmonyProfileRelease.p7b`（`bundle-name` 为 `com.example.hongmengzhian`）。签名命令使用 `hap-sign-tool.jar sign-app -mode localSign`，证书链必须为 3 级（叶子证书 + Application CA + Root CA）。
+AGC 已发布应用为「校安通」`0.2.5`，APPID 为 `6917618790016610414`。当前仓库 `1.0.0` 尚未提交发布。签名配置因含本机路径和口令未进入公开仓库；本地构建是否签名不代表商店是否已发布。
 
-2. **Android APK**：`.arkui-x/android/keystore.properties`（本地生成，已忽略）提供 `storeFile` / `storePassword` / `keyAlias` / `keyPassword`，`app/build.gradle` 读取后用于 release 签名；缺少该文件时回退为 debug 签名。
-
-3. **签名校验**：
-
-   ```bash
-   # HarmonyOS
-   java -jar <sdk>/toolchains/lib/hap-sign-tool.jar verify-app -inFile <hap> -outCertChain chain.cer -outProfile profile.p7b
-
-   # Android
-   apksigner verify --print-certs -v <apk>
-   ```
-
-> 发布包必须使用 release 证书签名，不得使用 debug 签名或 Android Debug 证书。
-
----
-
-## 发布包
+以下为早期 GitHub `v0.2.0` 的历史文件名，保留原始名称以便定位归档，不用于当前商店展示或新版本出包：
 
 | 平台 | 安装包 | 签名状态 | 说明 |
 | :--- | :--- | :--- | :--- |
-| HarmonyOS | HongMengZhiAn-v0.2.0-HarmonyOS-signed.hap | 已签名 Release HAP | 正式测试包 |
-| Android | HongMengZhiAn-v0.2.0-Android.apk | 已签名 Release APK | ArkUI-X 跨平台包 |
+| HarmonyOS | 校安通历史 HarmonyOS 安装包（v0.2.0） | 已签名 Release HAP | 正式测试包 |
+| Android | 校安通历史 Android 安装包（v0.2.0） | 已签名 Release APK | ArkUI-X 跨平台包 |
 
 发布地址：
 

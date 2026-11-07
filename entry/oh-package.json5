@@ -5,6 +5,6 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {}
+  "dependencies": { "libxiaoan.so": "file:./src/main/cpp/types/libxiaoan" }
 }
 

@@ -6,7 +6,7 @@ struct CampusSafetyCard {
   @State headline: string = '校园安全';
   @State primary: string = '暂无可展示的业务数据';
   @State secondary: string = '打开应用登录后查看安全动态';
-  @State hint: string = '点击打开鸿蒙智安';
+  @State hint: string = '点击打开校安通';
 
   build() {
     FormLink({

@@ -32,6 +32,8 @@
 
 # 本地回归验证临时目录（截图/ASCII 工具，不入库）
 /.regression/
+/entry/libs/
+/entry/src/main/resources/rawfile/xiaoan/
 
 # 本地发布包（体积大，不入库）
 /release/

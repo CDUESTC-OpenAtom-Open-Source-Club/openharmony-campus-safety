@@ -1,7 +1,10 @@
+import { CampusInputStyle } from '../common/InputStyles';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { Course, CourseColor } from '../model/Course';
 import { ScheduleService } from '../service/ScheduleService';
+import { PersonalDataMigrationService } from '../service/PersonalDataMigrationService';
+import { AccountService } from '../service/AccountService';
 import { AppTheme } from '../common/AppTheme';
 
 @Component
@@ -18,6 +21,7 @@ export struct StudentSchedulePage {
   @State private formEndPeriod: number = 2;
   @State private formColor: CourseColor = CourseColor.BLUE;
   @State private loading: boolean = true;
+  @State private legacyPending: boolean = false;
 
   private readonly weekdays: string[] = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   private readonly periods: number[] = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -27,6 +31,8 @@ export struct StudentSchedulePage {
   ];
 
   aboutToAppear(): void {
+    PersonalDataMigrationService.pending(getContext(this), 'student_schedule', 'courses')
+      .then((pending: boolean) => this.legacyPending = pending).catch(() => {});
     ScheduleService.getCourses(getContext(this) as common.Context).then((items: Course[]) => {
       this.courses = items;
       this.loading = false;
@@ -35,6 +41,18 @@ export struct StudentSchedulePage {
       this.loading = false;
       promptAction.showToast({ message: '课表读取失败' });
     });
+  }
+
+  private importLegacy(): void {
+    const owner: string = AccountService.getCurrentUser()?.id ?? '';
+    AlertDialog.show({ title: '导入旧课表？', message: '旧记录没有账号归属。仅当你确认这些记录属于自己时，才导入当前账号。原记录会保留。',
+      primaryButton: { value: '确认属于我并导入', action: async () => {
+        try {
+          await PersonalDataMigrationService.claim(getContext(this), 'student_schedule', 'courses', owner);
+          if (AccountService.getCurrentUser()?.id !== owner) return;
+          this.courses = await ScheduleService.getCourses(getContext(this)); this.legacyPending = false;
+        } catch (_) { promptAction.showToast({ message: '导入失败，请重试' }); }
+      } }, secondaryButton: { value: '取消', action: () => {} } });
   }
 
   private async persist(): Promise<void> {
@@ -388,8 +406,9 @@ export struct StudentSchedulePage {
           .border({ width: 1, color: AppTheme.line })
           .padding({ left: 12, right: 12 })
           .onChange((value: string) => this.formName = value)
+          .attributeModifier(new CampusInputStyle())
 
-        TextInput({ placeholder: '上课地点，例如 教学楼A301', text: this.formLocation })
+        TextInput({ placeholder: '上课地点', text: this.formLocation })
           .height(46)
           .fontSize(12)
           .backgroundColor(AppTheme.surfaceMuted)
@@ -397,6 +416,7 @@ export struct StudentSchedulePage {
           .border({ width: 1, color: AppTheme.line })
           .padding({ left: 12, right: 12 })
           .onChange((value: string) => this.formLocation = value)
+          .attributeModifier(new CampusInputStyle())
 
         Row({ space: 8 }) {
           Text('星期').fontSize(12).fontColor(AppTheme.muted).width(42)
@@ -486,6 +506,10 @@ export struct StudentSchedulePage {
 
       Scroll() {
         Column({ space: 12 }) {
+          if (this.legacyPending) {
+            Button('导入设备旧课表').onClick(() => this.importLegacy())
+              .fontColor(AppTheme.accent).backgroundColor(AppTheme.accentSoft)
+          }
           this.weekHeader()
 
           Text('点击已有课程可直接编辑；右上角按钮新增课程')

@@ -1,3 +1,4 @@
+import { CampusInputStyle } from '../common/InputStyles';
 import { promptAction } from '@kit.ArkUI';
 import { AccountService, LoginResult } from '../service/AccountService';
 import { UserRole } from '../model/User';
@@ -113,7 +114,7 @@ export struct LoginPage {
           .shadow({ radius: 10, color: AppTheme.glowBlue, offsetY: 2 })
 
           Column({ space: 2 }) {
-            Text('鸿蒙智安')
+            Text('校安通')
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor(AppTheme.ink)
@@ -159,32 +160,34 @@ export struct LoginPage {
             if (this.needsProfile()) {
               Column({ space: 5 }) {
                 this.fieldLabel('姓名', '展示名称')
-                TextInput({ placeholder: '请输入您的真实姓名', text: this.displayName })
+                TextInput({ text: this.displayName })
                   .height(44)
                   .backgroundColor(AppTheme.surfaceMuted)
                   .border({ width: 1, color: AppTheme.line })
                   .borderRadius(10)
                   .padding({ left: 12, right: 12 })
                   .onChange((value: string) => this.displayName = value)
+                  .attributeModifier(new CampusInputStyle())
               }
               .width('100%')
             }
 
             Column({ space: 5 }) {
               this.fieldLabel('账号', '3—32 位字母、数字或下划线')
-              TextInput({ placeholder: '请输入登录账号', text: this.username })
+              TextInput({ text: this.username })
                 .height(44)
                 .backgroundColor(AppTheme.surfaceMuted)
                 .border({ width: 1, color: AppTheme.line })
                 .borderRadius(10)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => this.username = value)
+                .attributeModifier(new CampusInputStyle())
             }
             .width('100%')
 
             Column({ space: 5 }) {
               this.fieldLabel('密码', '至少 10 位')
-              TextInput({ placeholder: '请输入密码', text: this.password })
+              TextInput({ text: this.password })
                 .height(44)
                 .backgroundColor(AppTheme.surfaceMuted)
                 .border({ width: 1, color: AppTheme.line })
@@ -192,13 +195,14 @@ export struct LoginPage {
                 .type(InputType.Password)
                 .padding({ left: 12, right: 12 })
                 .onChange((value: string) => this.password = value)
+                .attributeModifier(new CampusInputStyle())
             }
             .width('100%')
 
             if (this.registerMode && !this.internalMode) {
               Column({ space: 5 }) {
                 this.fieldLabel('确认密码', '与上方密码保持一致')
-                TextInput({ placeholder: '请再次输入密码', text: this.confirmPassword })
+                TextInput({ text: this.confirmPassword })
                   .height(44)
                   .backgroundColor(AppTheme.surfaceMuted)
                   .border({ width: 1, color: AppTheme.line })
@@ -206,6 +210,7 @@ export struct LoginPage {
                   .type(InputType.Password)
                   .padding({ left: 12, right: 12 })
                   .onChange((value: string) => this.confirmPassword = value)
+                  .attributeModifier(new CampusInputStyle())
               }
               .width('100%')
             }
@@ -213,13 +218,14 @@ export struct LoginPage {
             if (this.internalMode) {
               Column({ space: 5 }) {
                 this.fieldLabel('内部邀请码', '由管理员通过受控渠道签发')
-                TextInput({ placeholder: '请输入 32 位安全邀请凭证', text: this.invitationCode })
+                TextInput({ text: this.invitationCode })
                   .height(44)
                   .backgroundColor(AppTheme.surfaceMuted)
                   .border({ width: 1, color: AppTheme.line })
                   .borderRadius(10)
                   .padding({ left: 12, right: 12 })
                   .onChange((value: string) => this.invitationCode = value)
+                  .attributeModifier(new CampusInputStyle())
               }
               .width('100%')
             }

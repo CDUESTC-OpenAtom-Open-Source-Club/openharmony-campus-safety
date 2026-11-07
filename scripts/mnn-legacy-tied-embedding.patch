@@ -1,0 +1,29 @@
+diff --git a/transformers/llm/engine/src/diskembedding.cpp b/transformers/llm/engine/src/diskembedding.cpp
+index f3679b5..7d626b7 100644
+--- a/transformers/llm/engine/src/diskembedding.cpp
++++ b/transformers/llm/engine/src/diskembedding.cpp
+@@ -76,7 +76,9 @@ DiskEmbedding::DiskEmbedding(const std::shared_ptr<LlmConfig>& config, std::stri
+                 mAsymc = true;
+                 auto alphaPtr = (float*)mAlpha.get();
+                 for (int i=0; i<mBlockNum * oc; ++i) {
+-                    alphaPtr[2*i] = alphaPtr[2*i] + alphaPtr[2*i+1] * mOffset;
++                    if (!config->embedding_alpha_is_min()) {
++                        alphaPtr[2*i] = alphaPtr[2*i] + alphaPtr[2*i+1] * mOffset;
++                    }
+                 }
+             }
+         }
+diff --git a/transformers/llm/engine/src/llmconfig.hpp b/transformers/llm/engine/src/llmconfig.hpp
+index 01d9baa..47185e2 100644
+--- a/transformers/llm/engine/src/llmconfig.hpp
++++ b/transformers/llm/engine/src/llmconfig.hpp
+@@ -554,6 +554,9 @@ public:
+     std::vector<int64_t> tie_embeddings() const {
+         return config_.value("tie_embeddings", std::vector<int64_t>{});
+     }
++    bool embedding_alpha_is_min() const {
++        return config_.value("embedding_alpha_is_min", false);
++    }
+     // llm model config end >
+ 
+     // < sampler config start

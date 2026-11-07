@@ -1,6 +1,7 @@
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { CountdownEvent } from '../model/CountdownEvent';
+import { AccountService } from './AccountService';
 
 export class CountdownService {
   private static readonly PREF_NAME: string = 'countdown_events';
@@ -10,12 +11,15 @@ export class CountdownService {
   static async getEvents(
     context: common.Context
   ): Promise<CountdownEvent[]> {
+    const owner: string = AccountService.getCurrentUser()?.id ?? '';
+    if (owner === '') return [];
     const pref = await preferences.getPreferences(
       context,
       CountdownService.PREF_NAME
     );
 
-    const raw = await pref.get(CountdownService.KEY_EVENTS, '');
+    const raw = await pref.get(CountdownService.KEY_EVENTS + '_' + owner, '');
+    if (AccountService.getCurrentUser()?.id !== owner) throw new Error('账号已变化');
 
     if (typeof raw !== 'string' || raw.length === 0) {
       return [];
@@ -49,13 +53,16 @@ export class CountdownService {
     context: common.Context,
     events: CountdownEvent[]
   ): Promise<void> {
+    const owner: string = AccountService.getCurrentUser()?.id ?? '';
+    if (owner === '') throw new Error('请先登录');
     const pref = await preferences.getPreferences(
       context,
       CountdownService.PREF_NAME
     );
 
+    if (AccountService.getCurrentUser()?.id !== owner) throw new Error('账号已变化');
     await pref.put(
-      CountdownService.KEY_EVENTS,
+      CountdownService.KEY_EVENTS + '_' + owner,
       JSON.stringify(events)
     );
 
